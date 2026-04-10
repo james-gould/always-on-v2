@@ -37,7 +37,9 @@ Orleans guarantees single-threaded execution per grain, eliminating the need for
 3. The Gateway creates an `OrderGrain`, which transitions to `SeatsHeld` and registers an expiry reminder.
 4. On payment, the OrderGrain calls the payment provider, then makes grain-to-grain calls to `SectionGrain.ConfirmSeatAsync` and `UserGrain.AddOrderAsync` — no HTTP, no serialisation, just in-memory routing within the cluster.
 
-#### Infrastructure
+---
+
+### Infrastructure
 
 All infrastructure is defined in Bicep, modularised under `infra/` with a single `main.bicep` entry point composing discrete modules for networking, compute, data and edge.
 
@@ -72,3 +74,5 @@ A Standard-tier Key Vault is deployed with RBAC authorisation, soft delete (90-d
 ##### Edge — Azure Front Door
 
 Azure Front Door Premium acts as the global entry point, terminating TLS and routing traffic to the Gateway ingress. A WAF policy runs in Prevention mode with Microsoft Default Rule Set 2.1 and Bot Manager Rule Set 1.1. A custom rate-limit rule caps requests at 1,000 per minute per client IP.
+
+--- 
