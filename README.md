@@ -39,4 +39,36 @@ Orleans guarantees single-threaded execution per grain, eliminating the need for
 
 #### Infrastructure
 
-A WAF (Azure Front Door) sits in front of all infrastructure with a public IP address, internally routing requests. The Gateway runs as a `Deployment` with a horizontal pod autoscaler on CPU and request count. The Silo runs as a `StatefulSet` with stable network identities (required for Orleans cluster membership), using CosmosDB for grain persistence and the membership table. Separate AKS node pools isolate the stateless Gateway tier from the memory-optimised Silo tier.
+All infrastructure is defined in Bicep, modularised under `infra/` with a single `main.bicep` entry point composing discrete modules for networking, compute, data and edge.
+
+##### Networking
+
+A `/14` VNet is partitioned into dedicated subnets: one per AKS node pool (system, gateway, silo) and two for private endpoints (CosmosDB, Key Vault). Private DNS zones for `privatelink.documents.azure.com` and `privatelink.vaultcore.azure.net` are linked to the VNet, ensuring all PaaS traffic resolves over the private backbone. No public endpoints are exposed on any backing service.
+
+##### Compute — AKS
+
+A single AKS cluster hosts three node pools:
+
+- **System** (`Standard_D2s_v5`, 2–4 nodes) — Tainted for critical add-ons only; runs CoreDNS, kube-proxy and the secrets store CSI driver.
+- **Gateway** (`Standard_D4s_v5`, 2–20 nodes) — General-purpose pool for the stateless Gateway `Deployment`, autoscaling on CPU and request count.
+- **Silo** (`Standard_E4s_v5`, 3–15 nodes) — Memory-optimised pool for the Orleans `StatefulSet`, providing stable network identities required for cluster membership.
+
+All pools are spread across availability zones 1, 2 and 3 for zone-redundant resilience. Workload identity and OIDC issuer are enabled for keyless authentication to Azure services. The Key Vault secrets provider CSI driver rotates secrets on a two-minute polling interval. Cilium is configured as both the network plugin and policy engine. Container Insights ships logs and metrics to a Log Analytics workspace with a 30-day retention.
+
+##### Data — CosmosDB
+
+A serverless CosmosDB account with Session consistency hosts the `Orleans` database, pre-provisioned with three containers:
+
+- `OrleansCluster` (partitioned on `/ClusterId`) — Silo membership table.
+- `OrleansGrainState` (partitioned on `/PartitionKey`) — Persistent grain state.
+- `OrleansReminders` (partitioned on `/PartitionKey`) — Reminder registrations.
+
+The account is accessible only via a private endpoint in the VNet; public network access is disabled entirely. Automatic failover and zone redundancy are enabled.
+
+##### Secrets — Key Vault
+
+A Standard-tier Key Vault is deployed with RBAC authorisation, soft delete (90-day retention) and no public network access. AKS workloads access secrets through the CSI driver using workload identity; no connection strings are stored in application configuration.
+
+##### Edge — Azure Front Door
+
+Azure Front Door Premium acts as the global entry point, terminating TLS and routing traffic to the Gateway ingress. A WAF policy runs in Prevention mode with Microsoft Default Rule Set 2.1 and Bot Manager Rule Set 1.1. A custom rate-limit rule caps requests at 1,000 per minute per client IP.

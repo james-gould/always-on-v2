@@ -1,0 +1,100 @@
+@description('Azure region.')
+param location string
+
+@description('Naming prefix.')
+param resourcePrefix string
+
+@description('Resource tags.')
+param tags object
+
+var vnetName = '${resourcePrefix}-vnet'
+
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
+  name: vnetName
+  location: location
+  tags: tags
+  properties: {
+    addressSpace: {
+      addressPrefixes: [
+        '10.0.0.0/14'
+      ]
+    }
+    subnets: [
+      {
+        name: 'aks-system'
+        properties: {
+          addressPrefix: '10.0.0.0/16'
+        }
+      }
+      {
+        name: 'aks-gateway'
+        properties: {
+          addressPrefix: '10.1.0.0/16'
+        }
+      }
+      {
+        name: 'aks-silo'
+        properties: {
+          addressPrefix: '10.2.0.0/16'
+        }
+      }
+      {
+        name: 'private-endpoints'
+        properties: {
+          addressPrefix: '10.3.0.0/24'
+        }
+      }
+      {
+        name: 'keyvault-endpoints'
+        properties: {
+          addressPrefix: '10.3.1.0/24'
+        }
+      }
+    ]
+  }
+}
+
+resource cosmosDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
+  name: 'privatelink.documents.azure.com'
+  location: 'global'
+  tags: tags
+}
+
+resource cosmosDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
+  parent: cosmosDnsZone
+  name: '${vnetName}-cosmos-link'
+  location: 'global'
+  properties: {
+    virtualNetwork: {
+      id: vnet.id
+    }
+    registrationEnabled: false
+  }
+}
+
+resource keyVaultDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
+  name: 'privatelink.vaultcore.azure.net'
+  location: 'global'
+  tags: tags
+}
+
+resource keyVaultDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
+  parent: keyVaultDnsZone
+  name: '${vnetName}-keyvault-link'
+  location: 'global'
+  properties: {
+    virtualNetwork: {
+      id: vnet.id
+    }
+    registrationEnabled: false
+  }
+}
+
+output vnetId string = vnet.id
+output aksSystemSubnetId string = vnet.properties.subnets[0].id
+output aksGatewaySubnetId string = vnet.properties.subnets[1].id
+output aksSiloSubnetId string = vnet.properties.subnets[2].id
+output cosmosSubnetId string = vnet.properties.subnets[3].id
+output keyVaultSubnetId string = vnet.properties.subnets[4].id
+output cosmosDnsZoneId string = cosmosDnsZone.id
+output keyVaultDnsZoneId string = keyVaultDnsZone.id
