@@ -17,7 +17,7 @@ The architecture leans into Orleans' strengths rather than fighting them with HT
 
 There are two discrete runtime components and a shared library:
 
-- **Gateway** — A thin, stateless ASP.NET Core API sitting behind Azure Front Door. Handles authentication, rate limiting and request validation before forwarding calls into the Orleans cluster as a client. Scales horizontally with no state.
+- **Gateway** — A thin, stateless ASP.NET Core API sitting behind Azure Front Door. Handles request validation before forwarding calls into the Orleans cluster as a client. Scales horizontally with no state.
 - **Silo** — The Orleans silo hosting all grain implementations. Co-hosts ASP.NET Core for health checks and diagnostics but does not serve public traffic. Scales based on grain count and CPU utilisation.
 - **Abstractions** — A class library containing grain interfaces and shared DTOs, referenced by both the Gateway and Silo projects.
 
