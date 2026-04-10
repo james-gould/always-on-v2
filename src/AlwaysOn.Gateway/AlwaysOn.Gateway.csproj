@@ -13,7 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AlwaysOn.Abstractions\AlwaysOn.Abstractions.csproj" />
-    <ProjectReference Include="..\..\dev\AlwaysOn.ServiceDefaults\AlwaysOn.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\AlwaysOn.ServiceDefaults\AlwaysOn.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

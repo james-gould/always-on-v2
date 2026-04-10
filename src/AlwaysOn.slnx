@@ -2,10 +2,10 @@
   <Folder Name="/src/">
     <Project Path="AlwaysOn.Abstractions/AlwaysOn.Abstractions.csproj" />
     <Project Path="AlwaysOn.Gateway/AlwaysOn.Gateway.csproj" />
+    <Project Path="AlwaysOn.ServiceDefaults/AlwaysOn.ServiceDefaults.csproj" />
     <Project Path="AlwaysOn.Silo/AlwaysOn.Silo.csproj" />
   </Folder>
   <Folder Name="/dev/">
     <Project Path="../dev/AlwaysOn.AppHost/AlwaysOn.AppHost.csproj" />
-    <Project Path="../dev/AlwaysOn.ServiceDefaults/AlwaysOn.ServiceDefaults.csproj" />
   </Folder>
 </Solution>
