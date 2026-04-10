@@ -63,7 +63,7 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-09-02-preview' = {
         osSKU: 'AzureLinux'
         vnetSubnetID: gatewaySubnetId
         nodeLabels: {
-          'workload': 'gateway'
+          workload: 'gateway'
         }
       }
       {
@@ -79,7 +79,7 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-09-02-preview' = {
         osSKU: 'AzureLinux'
         vnetSubnetID: siloSubnetId
         nodeLabels: {
-          'workload': 'silo'
+          workload: 'silo'
         }
       }
     ]
