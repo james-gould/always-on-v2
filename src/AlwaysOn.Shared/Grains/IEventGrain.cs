@@ -1,4 +1,4 @@
-namespace AlwaysOn.Abstractions.Grains;
+namespace AlwaysOn.Shared.Grains;
 
 public interface IEventGrain : IGrainWithStringKey
 {

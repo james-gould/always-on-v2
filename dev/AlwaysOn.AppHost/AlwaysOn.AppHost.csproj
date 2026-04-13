@@ -11,6 +11,12 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\AlwaysOn.Gateway\AlwaysOn.Gateway.csproj" />
     <ProjectReference Include="..\..\src\AlwaysOn.Silo\AlwaysOn.Silo.csproj" />
+    <ProjectReference Include="..\..\src\AlwaysOn.Shared\AlwaysOn.Shared.csproj" IsAspireProjectResource="false"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Azure.CosmosDB" Version="13.2.2" />
+    <PackageReference Include="Aspire.Hosting.Orleans" Version="13.2.2" />
   </ItemGroup>
 
 </Project>

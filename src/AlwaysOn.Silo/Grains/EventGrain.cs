@@ -1,4 +1,4 @@
-using AlwaysOn.Abstractions.Grains;
+using AlwaysOn.Shared.Grains;
 
 namespace AlwaysOn.Silo.Grains;
 

@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AlwaysOn.Abstractions\AlwaysOn.Abstractions.csproj" />
+    <ProjectReference Include="..\AlwaysOn.Shared\AlwaysOn.Shared.csproj" />
     <ProjectReference Include="..\AlwaysOn.ServiceDefaults\AlwaysOn.ServiceDefaults.csproj" />
   </ItemGroup>
 
