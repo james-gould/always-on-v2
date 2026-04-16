@@ -9,7 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\AlwaysOn.Gateway\AlwaysOn.Gateway.csproj" />
     <ProjectReference Include="..\..\src\AlwaysOn.Silo\AlwaysOn.Silo.csproj" />
     <ProjectReference Include="..\..\src\AlwaysOn.Shared\AlwaysOn.Shared.csproj" IsAspireProjectResource="false" />
   </ItemGroup>

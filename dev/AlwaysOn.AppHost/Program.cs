@@ -15,9 +15,4 @@ var orleans = builder.AddOrleans(AspireConstants.Silo)
 var silo = builder.AddProject<Projects.AlwaysOn_Silo>(AspireConstants.Silo)
                   .WithReference(orleans);
 
-builder.AddProject<Projects.AlwaysOn_Gateway>(AspireConstants.Gateway)
-    .WithReference(silo)
-    .WithReference(db)
-    .WaitFor(silo);
-
 builder.Build().Run();

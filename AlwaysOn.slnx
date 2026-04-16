@@ -1,7 +1,6 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/AlwaysOn.Shared/AlwaysOn.Shared.csproj" />
-    <Project Path="src/AlwaysOn.Gateway/AlwaysOn.Gateway.csproj" />
     <Project Path="src/AlwaysOn.ServiceDefaults/AlwaysOn.ServiceDefaults.csproj" />
     <Project Path="src/AlwaysOn.Silo/AlwaysOn.Silo.csproj" />
   </Folder>
