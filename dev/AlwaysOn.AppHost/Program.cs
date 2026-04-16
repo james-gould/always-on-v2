@@ -2,8 +2,7 @@ using AlwaysOn.Shared.Constants;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-builder.AddAzureContainerAppEnvironment(AspireConstants.ContainerAppsEnvironment)
-       .WithAzdResourceNaming();
+var k8s = builder.AddKubernetesEnvironment(AspireConstants.KubernetesEnvironment);
 
 var cosmos = builder
                 .AddAzureCosmosDB(AspireConstants.CosmosResource)
@@ -19,6 +18,6 @@ var orleans = builder.AddOrleans(AspireConstants.Silo)
 var silo = builder.AddProject<Projects.AlwaysOn_Silo>(AspireConstants.Silo)
             .WithReference(orleans)
             .WithReference(db)
-            .WithExternalHttpEndpoints();
+            .WithComputeEnvironment(k8s);
 
 builder.Build().Run();

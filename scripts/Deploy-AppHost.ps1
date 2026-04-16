@@ -1,50 +1,50 @@
 <#
 .SYNOPSIS
-    Publishes or deploys the Aspire AppHost for AlwaysOn.
+    Publishes Aspire Kubernetes manifests for AlwaysOn and optionally applies them to AKS.
 
 .DESCRIPTION
-    Uses the Aspire AppHost as the source of truth for generated infrastructure and
-    deployment artifacts. This replaces the hand-authored Bicep deployment flow for
-    the current Aspire-based topology.
-
-.PARAMETER ResourceGroup
-    Azure resource group name used by aspire deploy.
-
-.PARAMETER Location
-    Azure region used by aspire deploy.
-
-.PARAMETER SubscriptionId
-    Azure subscription ID used by aspire deploy.
+    Uses the Aspire AppHost as the source of truth for generated Kubernetes manifests.
+    In an AKS workflow, infrastructure provisioning remains managed by infra/main.bicep.
+    Typical pipeline order is:
+      1) aspire publish (generate manifests)
+      2) infra deploy (AKS/Cosmos/KeyVault/network)
+      3) kubectl apply (deploy workloads)
 
 .PARAMETER PublishOnly
-    Generates publish artifacts without deploying them.
+    Generates Kubernetes manifest artifacts and does not apply them.
 
 .PARAMETER OutputPath
     Output path for publish artifacts. Defaults to artifacts/aspire.
 
+.PARAMETER ApplyToCluster
+    Applies published manifests to the current kubectl context.
+
+.PARAMETER KubeContext
+    Optional kubectl context name to target when applying manifests.
+
 .EXAMPLE
-    .\Deploy-AppHost.ps1 -ResourceGroup rg-alwayson-dev -Location uksouth
+    .\Deploy-AppHost.ps1
 
 .EXAMPLE
     .\Deploy-AppHost.ps1 -PublishOnly
+
+.EXAMPLE
+    .\Deploy-AppHost.ps1 -ApplyToCluster -KubeContext alwayson-dev
 #>
 
 [CmdletBinding()]
 param(
     [Parameter()]
-    [string]$ResourceGroup = 'rg-alwayson-dev',
-
-    [Parameter()]
-    [string]$Location = 'uksouth',
-
-    [Parameter()]
-    [string]$SubscriptionId,
-
-    [Parameter()]
     [switch]$PublishOnly,
 
     [Parameter()]
-    [string]$OutputPath
+    [string]$OutputPath,
+
+    [Parameter()]
+    [switch]$ApplyToCluster,
+
+    [Parameter()]
+    [string]$KubeContext
 )
 
 $ErrorActionPreference = 'Stop'
@@ -61,48 +61,46 @@ if (-not (Test-Path $appHostDir)) {
     Write-Error "AppHost directory not found: $appHostDir"
 }
 
-if (-not $PublishOnly) {
-    if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
-        Write-Error 'Azure CLI (az) is not installed or not on PATH.'
-    }
-
-    $account = az account show --output json 2>$null | ConvertFrom-Json
-    if (-not $account) {
-        Write-Error 'Not logged in. Run "az login" first.'
-    }
+if ($ApplyToCluster -and -not (Get-Command kubectl -ErrorAction SilentlyContinue)) {
+    Write-Error 'kubectl is not installed or not on PATH.'
 }
 
-$previousSubscriptionId = $env:Azure__SubscriptionId
-$previousLocation = $env:Azure__Location
-$previousResourceGroup = $env:Azure__ResourceGroup
-
 try {
-    if ($PSBoundParameters.ContainsKey('SubscriptionId')) {
-        $env:Azure__SubscriptionId = $SubscriptionId
-    }
-
-    $env:Azure__Location = $Location
-    $env:Azure__ResourceGroup = $ResourceGroup
-
     Push-Location $appHostDir
 
-    if ($PublishOnly) {
-        Write-Host "Publishing Aspire artifacts to '$publishOutput'..." -ForegroundColor Cyan
-        aspire publish -o $publishOutput
-    }
-    else {
-        Write-Host "Deploying Aspire AppHost from '$appHostDir'..." -ForegroundColor Cyan
-        aspire deploy
-    }
+    Write-Host "Publishing Aspire Kubernetes artifacts to '$publishOutput'..." -ForegroundColor Cyan
+    aspire publish -o $publishOutput
 
     if ($LASTEXITCODE -ne 0) {
-        throw 'Aspire command failed.'
+        throw 'Aspire publish failed.'
+    }
+
+    if ($PublishOnly) {
+        return
+    }
+
+    if ($ApplyToCluster) {
+        $manifestFiles = Get-ChildItem -Path $publishOutput -Recurse -File -Include *.yaml, *.yml
+        if (-not $manifestFiles) {
+            Write-Error "No Kubernetes manifest files were found under: $publishOutput"
+        }
+
+        if ($KubeContext) {
+            kubectl config use-context $KubeContext | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                throw "Failed to switch kubectl context to '$KubeContext'."
+            }
+        }
+
+        Write-Host "Applying manifests from '$publishOutput'..." -ForegroundColor Cyan
+        foreach ($manifestFile in $manifestFiles) {
+            kubectl apply -f $manifestFile.FullName
+            if ($LASTEXITCODE -ne 0) {
+                throw "kubectl apply failed for '$($manifestFile.FullName)'."
+            }
+        }
     }
 }
 finally {
     Pop-Location
-
-    $env:Azure__SubscriptionId = $previousSubscriptionId
-    $env:Azure__Location = $previousLocation
-    $env:Azure__ResourceGroup = $previousResourceGroup
 }

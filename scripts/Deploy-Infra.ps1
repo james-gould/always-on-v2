@@ -4,7 +4,10 @@
 
 .DESCRIPTION
     This script deploys the hand-authored Bicep templates under infra/. The current
-    preferred deployment path is the Aspire AppHost via scripts/Deploy-AppHost.ps1.
+        preferred AKS deployment pipeline is:
+            1) scripts/Deploy-AppHost.ps1 (aspire publish)
+            2) scripts/Deploy-Infra.ps1 (provision AKS/Cosmos/KeyVault/network)
+            3) scripts/Deploy-AppHost.ps1 -ApplyToCluster (kubectl apply)
 
 .PARAMETER Environment
     Target environment. Must be 'dev' or 'staging'.

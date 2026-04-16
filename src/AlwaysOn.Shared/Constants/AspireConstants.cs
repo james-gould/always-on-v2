@@ -3,7 +3,7 @@ namespace AlwaysOn.Shared.Constants;
 public sealed class AspireConstants
 {
     public const string Silo = "silo";
-    public const string ContainerAppsEnvironment = "alwayson";
+    public const string KubernetesEnvironment = "alwayson-aks";
 
     public const string CosmosResource = "cosmosdb";
     public const string CosmosDatabase = "alwayson";
