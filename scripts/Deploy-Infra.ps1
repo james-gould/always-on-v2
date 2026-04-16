@@ -1,6 +1,10 @@
 <#
 .SYNOPSIS
-    Deploys the AlwaysOn infrastructure to Azure.
+    Legacy Bicep deployment script for AlwaysOn infrastructure.
+
+.DESCRIPTION
+    This script deploys the hand-authored Bicep templates under infra/. The current
+    preferred deployment path is the Aspire AppHost via scripts/Deploy-AppHost.ps1.
 
 .PARAMETER Environment
     Target environment. Must be 'dev' or 'staging'.
