@@ -10,7 +10,7 @@ public sealed class OrderEndpointsTests(OrdersTestingFixture fixture) : IClassFi
     public async Task PostOrderWithQuantityCreatesOrderAndTicketIds()
     {
         var client = await fixture.GetClientAsync();
-
+        
         var request = new CreateOrderRequest(
             OrderId: Guid.NewGuid().ToString("N"),
             EventId: Guid.NewGuid().ToString("N"),
