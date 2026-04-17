@@ -14,8 +14,13 @@ var db = cosmos.AddCosmosDatabase(AspireConstants.CosmosDatabase);
 
 if (disableOrleansConfig)
 {
-    builder.AddProject<Projects.AlwaysOn_Silo>(AspireConstants.Silo)
+    var silo = builder.AddProject<Projects.AlwaysOn_Silo>(AspireConstants.Silo)
            .WithEnvironment("Testing__UseInMemoryOrleans", "true")
+           .WithComputeEnvironment(k8s);
+
+    builder.AddViteApp(AspireConstants.WebUI, "../../src/AlwaysOn.WebUI")
+           .WithReference(silo)
+           .WithHttpEndpoint(port: 5173, env: "PORT")
            .WithComputeEnvironment(k8s);
 }
 else
@@ -25,9 +30,14 @@ else
                          .WithGrainStorage(db)
                          .WithReminders(db);
 
-    builder.AddProject<Projects.AlwaysOn_Silo>(AspireConstants.Silo)
+    var silo = builder.AddProject<Projects.AlwaysOn_Silo>(AspireConstants.Silo)
            .WithReference(orleans)
            .WithReference(db)
+           .WithComputeEnvironment(k8s);
+
+    builder.AddViteApp(AspireConstants.WebUI, "../../src/AlwaysOn.WebUI")
+           .WithReference(silo)
+           .WithHttpEndpoint(port: 5173, env: "PORT")
            .WithComputeEnvironment(k8s);
 }
 
