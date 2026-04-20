@@ -41,20 +41,20 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview
 
 resource orleansDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-12-01-preview' = {
   parent: cosmosAccount
-  name: 'Orleans'
+  name: 'alwayson'
   properties: {
     resource: {
-      id: 'Orleans'
+      id: 'alwayson'
     }
   }
 }
 
 resource clusteringContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-12-01-preview' = {
   parent: orleansDatabase
-  name: 'OrleansCluster'
+  name: 'orleans-clustering'
   properties: {
     resource: {
-      id: 'OrleansCluster'
+      id: 'orleans-clustering'
       partitionKey: {
         paths: ['/ClusterId']
         kind: 'Hash'
@@ -66,10 +66,10 @@ resource clusteringContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases
 
 resource grainStateContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-12-01-preview' = {
   parent: orleansDatabase
-  name: 'OrleansGrainState'
+  name: 'orleans-grain-state'
   properties: {
     resource: {
-      id: 'OrleansGrainState'
+      id: 'orleans-grain-state'
       partitionKey: {
         paths: ['/PartitionKey']
         kind: 'Hash'
@@ -81,10 +81,10 @@ resource grainStateContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases
 
 resource remindersContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-12-01-preview' = {
   parent: orleansDatabase
-  name: 'OrleansReminders'
+  name: 'orleans-reminders'
   properties: {
     resource: {
-      id: 'OrleansReminders'
+      id: 'orleans-reminders'
       partitionKey: {
         paths: ['/PartitionKey']
         kind: 'Hash'
