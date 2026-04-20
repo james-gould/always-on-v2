@@ -43,9 +43,11 @@ Orleans guarantees single-threaded execution per grain, eliminating the need for
 
 All infrastructure is defined in Bicep, modularised under `infra/` with a single `main.bicep` entry point composing discrete modules for networking, compute, data and edge.
 
+![Infrastructure Topology](assets/topology.png)
+
 ##### Networking
 
-A `/14` VNet is partitioned into dedicated subnets: one per AKS node pool (system, gateway, silo) and two for private endpoints (CosmosDB, Key Vault). Private DNS zones for `privatelink.documents.azure.com` and `privatelink.vaultcore.azure.net` are linked to the VNet, ensuring all PaaS traffic resolves over the private backbone. No public endpoints are exposed on any backing service.
+A `/14` VNet is partitioned into dedicated subnets: one per AKS node pool (system, gateway, silo), a shared private endpoint subnet for all PaaS services (Cosmos DB, Key Vault), and a Private Link Service subnet for Front Door ingress. Private DNS zones for `privatelink.documents.azure.com` and `privatelink.vaultcore.azure.net` are linked to the VNet, ensuring all PaaS traffic resolves over the private backbone. No public endpoints are exposed on any backing service.
 
 ##### Compute — AKS
 
@@ -59,13 +61,13 @@ All pools are spread across availability zones 1, 2 and 3 for zone-redundant res
 
 ##### Data — CosmosDB
 
-A serverless CosmosDB account with Session consistency hosts the `Orleans` database, pre-provisioned with three containers:
+A serverless CosmosDB account with Session consistency hosts the `alwayson` database, pre-provisioned with three containers:
 
-- `OrleansCluster` (partitioned on `/ClusterId`) — Silo membership table.
-- `OrleansGrainState` (partitioned on `/PartitionKey`) — Persistent grain state.
-- `OrleansReminders` (partitioned on `/PartitionKey`) — Reminder registrations.
+- `orleans-clustering` (partitioned on `/ClusterId`) — Silo membership table.
+- `orleans-grain-state` (partitioned on `/PartitionKey`) — Persistent grain state.
+- `orleans-reminders` (partitioned on `/PartitionKey`) — Reminder registrations.
 
-The account is accessible only via a private endpoint in the VNet; public network access is disabled entirely. Automatic failover and zone redundancy are enabled.
+The account is accessible only via a private endpoint in the shared PE subnet; public network access is disabled entirely. Automatic failover and zone redundancy are enabled.
 
 ##### Secrets — Key Vault
 
@@ -73,6 +75,6 @@ A Standard-tier Key Vault is deployed with RBAC authorisation, soft delete (90-d
 
 ##### Edge — Azure Front Door
 
-Azure Front Door Premium acts as the global entry point, terminating TLS and routing traffic to the Gateway ingress. A WAF policy runs in Prevention mode with Microsoft Default Rule Set 2.1 and Bot Manager Rule Set 1.1. A custom rate-limit rule caps requests at 1,000 per minute per client IP.
+Azure Front Door Premium acts as the global entry point, terminating TLS and routing traffic to the AKS internal load balancer via Private Link Service. A WAF policy runs in Prevention mode with Microsoft Default Rule Set 2.1 and Bot Manager Rule Set 1.1. A custom rate-limit rule caps requests at 1,000 per minute per client IP. Front Door is the only publicly exposed resource — all backend traffic flows over the Azure private backbone.
 
 --- 

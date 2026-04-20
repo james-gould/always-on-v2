@@ -74,7 +74,7 @@ resource wafPolicy 'Microsoft.Network/FrontDoorWebApplicationFirewallPolicies@20
             {
               matchVariable: 'RequestUri'
               operator: 'RegEx'
-              matchValue: ['.*']
+              matchValue: ['.+']
             }
           ]
         }

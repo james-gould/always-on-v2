@@ -58,9 +58,6 @@ module aks 'modules/aks.bicep' = {
     location: location
     resourcePrefix: resourcePrefix
     tags: tags
-    systemSubnetId: network.outputs.aksSystemSubnetId
-    gatewaySubnetId: network.outputs.aksGatewaySubnetId
-    siloSubnetId: network.outputs.aksSiloSubnetId
   }
 }
 

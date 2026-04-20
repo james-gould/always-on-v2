@@ -26,16 +26,12 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview
       {
         locationName: location
         failoverPriority: 0
-        isZoneRedundant: true
+        isZoneRedundant: false
       }
     ]
     publicNetworkAccess: 'Disabled'
     enableAutomaticFailover: true
-    capabilities: [
-      {
-        name: 'EnableServerless'
-      }
-    ]
+    capacityMode: 'Serverless'
   }
 }
 

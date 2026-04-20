@@ -7,97 +7,47 @@ param resourcePrefix string
 @description('Resource tags.')
 param tags object
 
-@description('Subnet ID for the AKS system node pool.')
-param systemSubnetId string
-
-@description('Subnet ID for the Gateway node pool.')
-param gatewaySubnetId string
-
-@description('Subnet ID for the Silo node pool.')
-param siloSubnetId string
-
 var clusterName = '${resourcePrefix}-aks'
 
-resource aks 'Microsoft.ContainerService/managedClusters@2024-09-02-preview' = {
+resource aks 'Microsoft.ContainerService/managedClusters@2025-05-01' = {
   name: clusterName
   location: location
   tags: tags
+  sku: {
+    name: 'Base'
+    tier: 'Standard'
+  }
   identity: {
     type: 'SystemAssigned'
   }
   properties: {
     dnsPrefix: resourcePrefix
-    kubernetesVersion: '1.31'
+    kubernetesVersion: '1.33'
+    enableRBAC: true
+    supportPlan: 'KubernetesOfficial'
+    nodeResourceGroup: 'MC_${resourceGroup().name}_${clusterName}_${location}'
     networkProfile: {
       networkPlugin: 'azure'
-      networkPolicy: 'cilium'
-      networkDataplane: 'cilium'
+      loadBalancerSku: 'Standard'
       serviceCidr: '172.16.0.0/16'
       dnsServiceIP: '172.16.0.10'
     }
     agentPoolProfiles: [
       {
-        name: 'system'
+        name: 'agentpool'
         mode: 'System'
-        vmSize: 'Standard_D2s_v5'
+        vmSize: 'Standard_D2s_v6'
+        osSKU: 'Ubuntu'
+        osType: 'Linux'
+        type: 'VirtualMachineScaleSets'
         count: 2
         minCount: 2
-        maxCount: 4
+        maxCount: 5
         enableAutoScaling: true
-        availabilityZones: ['1', '2', '3']
-        osType: 'Linux'
-        osSKU: 'AzureLinux'
-        vnetSubnetID: systemSubnetId
-        nodeTaints: ['CriticalAddonsOnly=true:NoSchedule']
-      }
-      {
-        name: 'gateway'
-        mode: 'User'
-        vmSize: 'Standard_D4s_v5'
-        count: 2
-        minCount: 2
-        maxCount: 20
-        enableAutoScaling: true
-        availabilityZones: ['1', '2', '3']
-        osType: 'Linux'
-        osSKU: 'AzureLinux'
-        vnetSubnetID: gatewaySubnetId
-        nodeLabels: {
-          workload: 'gateway'
-        }
-      }
-      {
-        name: 'silo'
-        mode: 'User'
-        vmSize: 'Standard_E4s_v5'
-        count: 3
-        minCount: 3
-        maxCount: 15
-        enableAutoScaling: true
-        availabilityZones: ['1', '2', '3']
-        osType: 'Linux'
-        osSKU: 'AzureLinux'
-        vnetSubnetID: siloSubnetId
-        nodeLabels: {
-          workload: 'silo'
-        }
+        maxPods: 110
+        enableNodePublicIP: false
       }
     ]
-    addonProfiles: {
-      azureKeyvaultSecretsProvider: {
-        enabled: true
-        config: {
-          enableSecretRotation: 'true'
-          rotationPollInterval: '2m'
-        }
-      }
-      omsagent: {
-        enabled: true
-        config: {
-          logAnalyticsWorkspaceResourceID: logAnalytics.id
-        }
-      }
-    }
     oidcIssuerProfile: {
       enabled: true
     }
@@ -108,6 +58,10 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-09-02-preview' = {
     }
     autoUpgradeProfile: {
       upgradeChannel: 'stable'
+      nodeOSUpgradeChannel: 'NodeImage'
+    }
+    nodeProvisioningProfile: {
+      mode: 'Manual'
     }
   }
 }
