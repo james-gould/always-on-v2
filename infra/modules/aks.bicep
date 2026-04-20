@@ -7,6 +7,9 @@ param resourcePrefix string
 @description('Resource tags.')
 param tags object
 
+@description('Subnet resource ID for AKS system node pool.')
+param aksSubnetId string
+
 var clusterName = '${resourcePrefix}-aks'
 
 resource aks 'Microsoft.ContainerService/managedClusters@2025-05-01' = {
@@ -46,6 +49,7 @@ resource aks 'Microsoft.ContainerService/managedClusters@2025-05-01' = {
         enableAutoScaling: true
         maxPods: 110
         enableNodePublicIP: false
+        vnetSubnetID: aksSubnetId
       }
     ]
     oidcIssuerProfile: {

@@ -1,5 +1,6 @@
 using AlwaysOn.Shared.Constants;
 using AlwaysOn.Silo.Endpoints;
+using Azure.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,10 +22,17 @@ else
 {
     var cosmosConnectionString = builder.Configuration.GetConnectionString(AspireConstants.CosmosDatabase)
         ?? builder.Configuration.GetConnectionString(AspireConstants.LegacyCosmosConnectionString);
-    if (string.IsNullOrWhiteSpace(cosmosConnectionString))
+    var cosmosAccountEndpoint = builder.Configuration["Orleans:Cosmos:AccountEndpoint"];
+
+    if (string.IsNullOrWhiteSpace(cosmosConnectionString) && string.IsNullOrWhiteSpace(cosmosAccountEndpoint))
     {
-        throw new InvalidOperationException($"Missing ConnectionStrings:{AspireConstants.CosmosDatabase} configuration.");
+        throw new InvalidOperationException(
+            $"Missing ConnectionStrings:{AspireConstants.CosmosDatabase} or Orleans:Cosmos:AccountEndpoint configuration.");
     }
+
+    // Use AAD auth when AccountEndpoint is provided, otherwise fall back to connection string
+    var useAadAuth = !string.IsNullOrWhiteSpace(cosmosAccountEndpoint);
+    var credential = useAadAuth ? new DefaultAzureCredential() : null;
 
     var cosmosDatabaseName = builder.Configuration["Orleans:Cosmos:DatabaseName"] ?? AspireConstants.CosmosDatabase;
     var clusteringContainerName = builder.Configuration["Orleans:Cosmos:ClusteringContainerName"] ?? AspireConstants.OrleansClusteringContainer;
@@ -36,7 +44,10 @@ else
     {
         siloBuilder.UseCosmosClustering(options =>
         {
-            options.ConfigureCosmosClient(cosmosConnectionString);
+            if (useAadAuth)
+                options.ConfigureCosmosClient(cosmosAccountEndpoint!, credential!);
+            else
+                options.ConfigureCosmosClient(cosmosConnectionString!);
             options.DatabaseName = cosmosDatabaseName;
             options.ContainerName = clusteringContainerName;
             options.IsResourceCreationEnabled = isResourceCreationEnabled;
@@ -44,7 +55,10 @@ else
 
         siloBuilder.UseCosmosReminderService(options =>
         {
-            options.ConfigureCosmosClient(cosmosConnectionString);
+            if (useAadAuth)
+                options.ConfigureCosmosClient(cosmosAccountEndpoint!, credential!);
+            else
+                options.ConfigureCosmosClient(cosmosConnectionString!);
             options.DatabaseName = cosmosDatabaseName;
             options.ContainerName = remindersContainerName;
             options.IsResourceCreationEnabled = isResourceCreationEnabled;
@@ -52,7 +66,10 @@ else
 
         siloBuilder.AddCosmosGrainStorageAsDefault(options =>
         {
-            options.ConfigureCosmosClient(cosmosConnectionString);
+            if (useAadAuth)
+                options.ConfigureCosmosClient(cosmosAccountEndpoint!, credential!);
+            else
+                options.ConfigureCosmosClient(cosmosConnectionString!);
             options.DatabaseName = cosmosDatabaseName;
             options.ContainerName = grainStateContainerName;
             options.IsResourceCreationEnabled = isResourceCreationEnabled;

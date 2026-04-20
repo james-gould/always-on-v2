@@ -18,6 +18,7 @@ on:
       - dev/**
       - infra/**
       - scripts/**
+      - k8s/**
       - .github/workflows/bicep-up.yml
   pull_request:
     paths:
@@ -25,6 +26,7 @@ on:
       - dev/**
       - infra/**
       - scripts/**
+      - k8s/**
       - .github/workflows/bicep-up.yml
 
 permissions:
@@ -36,7 +38,7 @@ env:
   TARGET_ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
 
 jobs:
-  build-and-publish-manifests:
+  build-and-validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,27 +51,8 @@ jobs:
       - name: Restore and build
         run: dotnet build ./AlwaysOn.slnx -v minimal
 
-      - name: Install Aspire CLI
-        shell: pwsh
-        run: |
-          Invoke-RestMethod https://aspire.dev/install.ps1 | Invoke-Expression
-          "$HOME/.aspire/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          aspire --version
-
-      - name: Publish Kubernetes manifests
-        shell: pwsh
-        run: ./scripts/Deploy-AppHost.ps1 -PublishOnly -OutputPath ./artifacts/aspire
-
-      - name: Upload manifests artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: aspire-manifests-${{ env.TARGET_ENVIRONMENT }}
-          path: artifacts/aspire
-          if-no-files-found: error
-
   validate-infra:
     runs-on: ubuntu-latest
-    needs: build-and-publish-manifests
     steps:
       - uses: actions/checkout@v4
 
@@ -84,7 +67,7 @@ jobs:
         run: |
           RG_NAME="rg-alwayson-${TARGET_ENVIRONMENT}"
           if [ "$(az group exists --name "$RG_NAME")" != "true" ]; then
-            az group create --name "$RG_NAME" --location uksouth --output none
+            az group create --name "$RG_NAME" --location westeurope --output none
           fi
 
       - name: Bicep what-if
@@ -96,19 +79,25 @@ jobs:
             --parameters "@infra/main.bicepparam.${TARGET_ENVIRONMENT}.json" \
             --parameters keyVaultAdminObjectId="${{ secrets.KEYVAULT_ADMIN_OBJECT_ID }}"
 
-  deploy-infra-and-workloads:
+  deploy:
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    needs: validate-infra
+    needs: [build-and-validate, validate-infra]
     environment: ${{ github.event.inputs.environment || 'dev' }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download manifests artifact
-        uses: actions/download-artifact@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          name: aspire-manifests-${{ env.TARGET_ENVIRONMENT }}
-          path: artifacts/aspire
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install Aspire CLI
+        shell: bash
+        run: |
+          curl -fsSL https://aspire.dev/install.sh | bash
+          echo "$HOME/.aspire/bin" >> "$GITHUB_PATH"
+          aspire --version
 
       - name: Azure login
         uses: azure/login@v2
@@ -121,7 +110,7 @@ jobs:
         run: |
           RG_NAME="rg-alwayson-${TARGET_ENVIRONMENT}"
           if [ "$(az group exists --name "$RG_NAME")" != "true" ]; then
-            az group create --name "$RG_NAME" --location uksouth --output none
+            az group create --name "$RG_NAME" --location westeurope --output none
           fi
 
           az deployment group create \
@@ -131,26 +120,9 @@ jobs:
             --parameters keyVaultAdminObjectId="${{ secrets.KEYVAULT_ADMIN_OBJECT_ID }}" \
             --output table
 
-      - name: Set AKS context
-        uses: azure/aks-set-context@v4
-        with:
-          resource-group: rg-alwayson-${{ env.TARGET_ENVIRONMENT }}
-          cluster-name: alwayson-${{ env.TARGET_ENVIRONMENT }}-aks
-
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v4
-
-      - name: Apply published manifests
-        shell: bash
+      - name: Deploy workloads
+        shell: pwsh
         run: |
-          set -euo pipefail
-          files=$(find artifacts/aspire -type f \( -name '*.yaml' -o -name '*.yml' \))
-          if [ -z "$files" ]; then
-            echo "No Kubernetes manifests found under artifacts/aspire"
-            exit 1
-          fi
-
-          while IFS= read -r file; do
-            echo "Applying $file"
-            kubectl apply -f "$file"
-          done <<< "$files"
+          ./scripts/Deploy-AppHost.ps1 `
+            -Environment $env:TARGET_ENVIRONMENT `
+            -ImageTag ${{ github.sha }}

@@ -1,0 +1,8 @@
+# Dev environment Helm values override.
+# Image and connection string are injected at deploy time by Deploy-AppHost.ps1.
+# This file contains the Azure networking overrides that Aspire cannot generate.
+service:
+  silo:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/azure-load-balancer-internal: "true"

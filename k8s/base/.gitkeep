@@ -1,0 +1,2 @@
+# Aspire publish generates base manifests here — do not check in.
+# The deploy script runs `aspire publish -o k8s/base` which populates this directory.

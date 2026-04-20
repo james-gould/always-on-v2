@@ -24,7 +24,7 @@ if (!isTestMode)
 {
     builder.AddViteApp(AspireConstants.WebUI, "../../src/AlwaysOn.WebUI")
            .WithReference(silo)
-           .WithHttpEndpoint(port: 5173, env: "PORT")
+           .WithHttpEndpoint(port: 5173, name: "vite", env: "PORT")
            .WithComputeEnvironment(k8s);
 }
 

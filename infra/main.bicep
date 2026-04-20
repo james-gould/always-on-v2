@@ -59,6 +59,17 @@ module aks 'modules/aks.bicep' = {
     location: location
     resourcePrefix: resourcePrefix
     tags: tags
+    aksSubnetId: network.outputs.aksSystemSubnetId
+  }
+}
+
+module acr 'modules/acr.bicep' = {
+  name: 'acr'
+  params: {
+    location: location
+    resourcePrefix: resourcePrefix
+    tags: tags
+    aksKubeletPrincipalId: aks.outputs.kubeletIdentityObjectId
   }
 }
 
@@ -71,7 +82,21 @@ module frontDoor 'modules/frontdoor.bicep' = {
   }
 }
 
+module identity 'modules/identity.bicep' = {
+  name: 'identity'
+  params: {
+    location: location
+    resourcePrefix: resourcePrefix
+    tags: tags
+    aksOidcIssuerUrl: aks.outputs.oidcIssuerUrl
+    cosmosAccountName: cosmosDb.outputs.accountName
+  }
+}
+
 output aksClusterName string = aks.outputs.clusterName
 output cosmosAccountName string = cosmosDb.outputs.accountName
+output cosmosAccountEndpoint string = cosmosDb.outputs.accountEndpoint
 output keyVaultName string = keyVault.outputs.vaultName
 output frontDoorEndpoint string = frontDoor.outputs.endpoint
+output acrLoginServer string = acr.outputs.loginServer
+output siloIdentityClientId string = identity.outputs.identityClientId
