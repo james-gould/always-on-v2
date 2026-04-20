@@ -34,7 +34,8 @@ module network 'modules/network.bicep' = {
 module cosmosDb 'modules/cosmos.bicep' = {
   name: 'cosmos'
   params: {
-    location: location
+    location: 'northeurope'
+    peLocation: location
     resourcePrefix: resourcePrefix
     tags: tags
     privateEndpointSubnetId: network.outputs.privateEndpointSubnetId

@@ -1,6 +1,9 @@
 @description('Azure region.')
 param location string
 
+@description('Azure region for the private endpoint (must match the VNet).')
+param peLocation string = location
+
 @description('Naming prefix.')
 param resourcePrefix string
 
@@ -31,7 +34,6 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview
     ]
     publicNetworkAccess: 'Disabled'
     enableAutomaticFailover: true
-    capacityMode: 'Serverless'
   }
 }
 
@@ -41,6 +43,11 @@ resource orleansDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@202
   properties: {
     resource: {
       id: 'alwayson'
+    }
+    options: {
+      autoscaleSettings: {
+        maxThroughput: 1000
+      }
     }
   }
 }
@@ -92,7 +99,7 @@ resource remindersContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/
 
 resource privateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: '${resourcePrefix}-cosmos-pe'
-  location: location
+  location: peLocation
   tags: tags
   properties: {
     subnet: {

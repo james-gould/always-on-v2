@@ -66,18 +66,6 @@ resource aks 'Microsoft.ContainerService/managedClusters@2025-05-01' = {
   }
 }
 
-resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-  name: '${resourcePrefix}-logs'
-  location: location
-  tags: tags
-  properties: {
-    sku: {
-      name: 'PerGB2018'
-    }
-    retentionInDays: 30
-  }
-}
-
 output clusterName string = aks.name
 output clusterIdentityPrincipalId string = aks.identity.principalId
 output kubeletIdentityObjectId string = aks.properties.identityProfile.kubeletidentity.objectId
