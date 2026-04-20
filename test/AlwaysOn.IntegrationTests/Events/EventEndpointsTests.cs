@@ -4,7 +4,8 @@ using AlwaysOn.IntegrationTests.SetupHelper.Models;
 
 namespace AlwaysOn.IntegrationTests.Events;
 
-public sealed class EventEndpointsTests(EventsTestingFixture fixture) : IClassFixture<EventsTestingFixture>
+[Collection(AppHostCollection.Name)]
+public sealed class EventEndpointsTests(AppHostTestFixture fixture)
 {
     [Fact]
     public async Task PostEventThenGetEventReturnsCreatedPayload()

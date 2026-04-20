@@ -4,7 +4,8 @@ using AlwaysOn.IntegrationTests.SetupHelper.Models;
 
 namespace AlwaysOn.IntegrationTests.Orders;
 
-public sealed class OrderEndpointsTests(OrdersTestingFixture fixture) : IClassFixture<OrdersTestingFixture>
+[Collection(AppHostCollection.Name)]
+public sealed class OrderEndpointsTests(AppHostTestFixture fixture)
 {
     [Fact]
     public async Task PostOrderWithQuantityCreatesOrderAndTicketIds()

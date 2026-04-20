@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace AlwaysOn.IntegrationTests.SetupHelper.Fixtures;
 
-public abstract class AppHostTestFixture : IAsyncLifetime
+public sealed class AppHostTestFixture : IAsyncLifetime
 {
     private readonly TimeSpan _waitTimeout = TimeSpan.FromSeconds(45);
 
@@ -13,15 +13,15 @@ public abstract class AppHostTestFixture : IAsyncLifetime
     private ResourceNotificationService? _notifications;
     private HttpClient? _client;
 
-    protected string SiloResourceName => "silo";
+    private string SiloResourceName => "silo";
 
-    protected string NewId() => Guid.NewGuid().ToString("N");
+    public string NewId() => Guid.NewGuid().ToString("N");
 
     public async Task InitializeAsync()
     {
         var builder = await DistributedApplicationTestingBuilder
             .CreateAsync<Projects.AlwaysOn_AppHost>(
-            ["--Testing:DisableAppHostOrleansConfig=true"],
+            ["--Testing:IsTestMode=true"],
             (options, _) =>
             {
                 options.DisableDashboard = true;
@@ -48,7 +48,7 @@ public abstract class AppHostTestFixture : IAsyncLifetime
         return ValueTask.FromResult(_client);
     }
 
-    public virtual async Task DisposeAsync()
+    public async Task DisposeAsync()
     {
         _client?.Dispose();
 

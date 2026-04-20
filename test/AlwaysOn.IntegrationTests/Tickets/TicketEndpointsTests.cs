@@ -4,7 +4,8 @@ using AlwaysOn.IntegrationTests.SetupHelper.Models;
 
 namespace AlwaysOn.IntegrationTests.Tickets;
 
-public sealed class TicketEndpointsTests(TicketsTestingFixture fixture) : IClassFixture<TicketsTestingFixture>
+[Collection(AppHostCollection.Name)]
+public sealed class TicketEndpointsTests(AppHostTestFixture fixture)
 {
     [Fact]
     public async Task PostTicketThenGetTicketReturnsIssuedTicket()

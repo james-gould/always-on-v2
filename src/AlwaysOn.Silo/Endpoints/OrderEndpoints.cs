@@ -28,7 +28,7 @@ public static class OrderEndpoints
             var issuedTickets = new List<TicketDetails>(request.TicketQuantity);
             var ticketIds = new List<string>(request.TicketQuantity);
 
-            foreach(var issuedTicket in issuedTickets)
+            for (var i = 0; i < request.TicketQuantity; i++)
             {
                 var ticketId = Guid.NewGuid().ToString("N");
                 var ticket = await grains.GetGrain<ITicketGrain>(ticketId)
