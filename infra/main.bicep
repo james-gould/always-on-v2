@@ -13,6 +13,9 @@ param baseName string = 'alwayson'
 @description('Object ID of the Azure AD group or user that should have Key Vault admin access.')
 param keyVaultAdminObjectId string
 
+@description('Hostname of the AKS internal ingress (set after K8s ingress is deployed).')
+param originHostName string
+
 var resourcePrefix = '${baseName}-${environment}'
 var tags = {
   project: 'always-on'
@@ -34,7 +37,7 @@ module cosmosDb 'modules/cosmos.bicep' = {
     location: location
     resourcePrefix: resourcePrefix
     tags: tags
-    cosmosSubnetId: network.outputs.cosmosSubnetId
+    privateEndpointSubnetId: network.outputs.privateEndpointSubnetId
   }
 }
 
@@ -44,7 +47,7 @@ module keyVault 'modules/keyvault.bicep' = {
     location: location
     resourcePrefix: resourcePrefix
     tags: tags
-    keyVaultSubnetId: network.outputs.keyVaultSubnetId
+    privateEndpointSubnetId: network.outputs.privateEndpointSubnetId
     adminObjectId: keyVaultAdminObjectId
   }
 }
@@ -66,6 +69,7 @@ module frontDoor 'modules/frontdoor.bicep' = {
   params: {
     resourcePrefix: resourcePrefix
     tags: tags
+    originHostName: originHostName
   }
 }
 

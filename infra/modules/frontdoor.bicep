@@ -4,7 +4,14 @@ param resourcePrefix string
 @description('Resource tags.')
 param tags object
 
+@description('Hostname of the AKS internal ingress (set after K8s ingress deployment).')
+param originHostName string
+
+@description('Resource ID of the Private Link Service fronting the AKS internal load balancer.')
+param privateLinkServiceId string = ''
+
 var profileName = '${resourcePrefix}-afd'
+var hasPrivateLink = !empty(privateLinkServiceId)
 
 resource frontDoorProfile 'Microsoft.Cdn/profiles@2024-09-01' = {
   name: profileName
@@ -97,6 +104,72 @@ resource securityPolicy 'Microsoft.Cdn/profiles/securityPolicies@2024-09-01' = {
       ]
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Origin group, origin, and route — routes Front Door traffic to AKS internally
+// ---------------------------------------------------------------------------
+
+resource originGroup 'Microsoft.Cdn/profiles/originGroups@2024-09-01' = {
+  parent: frontDoorProfile
+  name: 'aks-origin-group'
+  properties: {
+    loadBalancingSettings: {
+      sampleSize: 4
+      successfulSamplesRequired: 3
+    }
+    healthProbeSettings: {
+      probePath: '/health'
+      probeRequestType: 'HEAD'
+      probeProtocol: 'Http'
+      probeIntervalInSeconds: 30
+    }
+  }
+}
+
+resource origin 'Microsoft.Cdn/profiles/originGroups/origins@2024-09-01' = {
+  parent: originGroup
+  name: 'aks-origin'
+  properties: {
+    hostName: originHostName
+    httpPort: 80
+    httpsPort: 443
+    originHostHeader: originHostName
+    priority: 1
+    weight: 1000
+    enabledState: 'Enabled'
+    enforceCertificateNameCheck: true
+    sharedPrivateLinkResource: hasPrivateLink
+      ? {
+          privateLink: {
+            id: privateLinkServiceId
+          }
+          privateLinkLocation: frontDoorProfile.location
+          requestMessage: 'Front Door Private Link to AKS'
+        }
+      : null
+  }
+}
+
+resource route 'Microsoft.Cdn/profiles/afdEndpoints/routes@2024-09-01' = {
+  parent: endpoint
+  name: 'default-route'
+  properties: {
+    originGroup: {
+      id: originGroup.id
+    }
+    supportedProtocols: [
+      'Http'
+      'Https'
+    ]
+    patternsToMatch: ['/*']
+    forwardingProtocol: 'HttpOnly'
+    linkToDefaultDomain: 'Enabled'
+    httpsRedirect: 'Enabled'
+  }
+  dependsOn: [
+    origin
+  ]
 }
 
 output profileName string = frontDoorProfile.name

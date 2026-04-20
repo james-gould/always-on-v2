@@ -7,8 +7,8 @@ param resourcePrefix string
 @description('Resource tags.')
 param tags object
 
-@description('Subnet resource ID for the Key Vault private endpoint.')
-param keyVaultSubnetId string
+@description('Subnet resource ID for private endpoints.')
+param privateEndpointSubnetId string
 
 @description('Object ID of the principal granted Key Vault Administrator role.')
 param adminObjectId string
@@ -53,7 +53,7 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   tags: tags
   properties: {
     subnet: {
-      id: keyVaultSubnetId
+      id: privateEndpointSubnetId
     }
     privateLinkServiceConnections: [
       {

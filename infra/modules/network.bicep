@@ -39,15 +39,18 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
         }
       }
       {
+        // Shared subnet for all private endpoints (Cosmos, Key Vault, etc.)
         name: 'private-endpoints'
         properties: {
           addressPrefix: '10.3.0.0/24'
         }
       }
       {
-        name: 'keyvault-endpoints'
+        // Subnet for Private Link Service (Front Door → AKS internal LB)
+        name: 'private-link-service'
         properties: {
           addressPrefix: '10.3.1.0/24'
+          privateLinkServiceNetworkPolicies: 'Disabled'
         }
       }
     ]
@@ -94,7 +97,5 @@ output vnetId string = vnet.id
 output aksSystemSubnetId string = vnet.properties.subnets[0].id
 output aksGatewaySubnetId string = vnet.properties.subnets[1].id
 output aksSiloSubnetId string = vnet.properties.subnets[2].id
-output cosmosSubnetId string = vnet.properties.subnets[3].id
-output keyVaultSubnetId string = vnet.properties.subnets[4].id
-output cosmosDnsZoneId string = cosmosDnsZone.id
-output keyVaultDnsZoneId string = keyVaultDnsZone.id
+output privateEndpointSubnetId string = vnet.properties.subnets[3].id
+output plsSubnetId string = vnet.properties.subnets[4].id

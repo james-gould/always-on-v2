@@ -7,8 +7,8 @@ param resourcePrefix string
 @description('Resource tags.')
 param tags object
 
-@description('Subnet resource ID for the Cosmos DB private endpoint.')
-param cosmosSubnetId string
+@description('Subnet resource ID for private endpoints.')
+param privateEndpointSubnetId string
 
 var accountName = replace('${resourcePrefix}-cosmos', '-', '')
 
@@ -100,7 +100,7 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   tags: tags
   properties: {
     subnet: {
-      id: cosmosSubnetId
+      id: privateEndpointSubnetId
     }
     privateLinkServiceConnections: [
       {

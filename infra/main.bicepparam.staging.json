@@ -10,6 +10,9 @@
     },
     "keyVaultAdminObjectId": {
       "value": "<REPLACE_WITH_YOUR_AZURE_AD_OBJECT_ID>"
+    },
+    "originHostName": {
+      "value": "<REPLACE_WITH_AKS_INTERNAL_INGRESS_IP>"
     }
   }
 }
