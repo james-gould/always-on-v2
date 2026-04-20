@@ -31,7 +31,7 @@ param(
     [string]$Environment,
 
     [Parameter()]
-    [string]$Location = 'uksouth',
+    [string]$Location = 'westeurope',
 
     [Parameter()]
     [switch]$DryRun
