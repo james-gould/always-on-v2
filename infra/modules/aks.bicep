@@ -72,6 +72,15 @@ resource aks 'Microsoft.ContainerService/managedClusters@2025-05-01' = {
 }
 
 // AKS cluster identity needs Network Contributor on the subnet to create internal load balancers
+resource aksVnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: split(aksSubnetId, '/')[8]
+}
+
+resource aksSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  parent: aksVnet
+  name: split(aksSubnetId, '/')[10]
+}
+
 resource subnetRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(aksSubnetId, aks.id, networkContributorRoleId)
   scope: aksSubnet
@@ -80,10 +89,6 @@ resource subnetRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-0
     principalId: aks.identity.principalId
     principalType: 'ServicePrincipal'
   }
-}
-
-resource aksSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
-  name: '${split(aksSubnetId, '/')[8]}/${split(aksSubnetId, '/')[10]}'
 }
 
 output clusterName string = aks.name
