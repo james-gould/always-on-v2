@@ -50,23 +50,17 @@ az ad app federated-credential create \
   }'
 ```
 
-## RBAC Role Assignment
+## RBAC Role Assignments
 
-The service principal is assigned **Contributor** at the subscription scope:
+The service principal has two roles at the subscription scope:
 
-| Property | Value |
-|---|---|
-| Role | Contributor |
-| Scope | `/subscriptions/2b4c73d5-769b-4b2f-9f5f-420c55fdee99` |
-| Assignment ID | `f2cef2eb-6d04-43e1-b93c-ebb1a512f777` |
+| Role | Scope | Why |
+|---|---|---|
+| **Contributor** | `/subscriptions/2b4c73d5-769b-4b2f-9f5f-420c55fdee99` | Create/delete resource groups, deploy Bicep templates, access AKS credentials, push to ACR |
+| **User Access Administrator** | `/subscriptions/2b4c73d5-769b-4b2f-9f5f-420c55fdee99` | Create role assignments defined in Bicep (Key Vault RBAC, AcrPull, Cosmos data contributor) |
 
-Contributor is required because the workflows need to:
-- Create and delete resource groups
-- Deploy Bicep templates (all resource types)
-- Access AKS credentials (`az aks get-credentials`)
-- Push images to ACR (`az acr login`)
-
-Without this role assignment, the OIDC login succeeds but `az` returns "no subscriptions found" because the SP has no visibility into the subscription.
+Without **Contributor**, the OIDC login succeeds but `az` returns "no subscriptions found".
+Without **User Access Administrator**, Bicep deployments fail on `Microsoft.Authorization/roleAssignments/write`.
 
 ## Required GitHub Repository Secrets
 
