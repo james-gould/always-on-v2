@@ -14,4 +14,7 @@ public sealed class AspireConstants
     public const string OrleansRemindersContainer = "orleans-reminders";
 
     public const string RedisCache = "cache";
+
+    public const string ServiceBus = "servicebus";
+    public const string ReservationsQueue = "reservations-ready";
 }

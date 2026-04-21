@@ -1,6 +1,8 @@
 using AlwaysOn.Shared.Constants;
 using AlwaysOn.Silo.Caching;
 using AlwaysOn.Silo.Endpoints;
+using AlwaysOn.Silo.Grains;
+using AlwaysOn.Silo.Queueing;
 using Azure.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -88,11 +90,32 @@ if (hasRedis)
     builder.Services.AddOptions<EventReadCacheOptions>()
         .Bind(builder.Configuration.GetSection("EventReadCache"));
     builder.Services.AddSingleton<IEventReadCache, RedisEventReadCache>();
+    builder.Services.AddSingleton<IQueueIndex, RedisQueueIndex>();
 }
 else
 {
     builder.Services.AddSingleton<IEventReadCache, InMemoryEventReadCache>();
+    builder.Services.AddSingleton<IQueueIndex, InMemoryQueueIndex>();
 }
+
+// Service Bus reservation notifier. Falls back to an in-memory no-op when not
+// configured so integration tests run without a broker.
+var hasServiceBus = !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString(AspireConstants.ServiceBus))
+    || !string.IsNullOrWhiteSpace(builder.Configuration[$"ConnectionStrings:{AspireConstants.ServiceBus}"]);
+if (hasServiceBus)
+{
+    builder.AddAzureServiceBusClient(AspireConstants.ServiceBus);
+    builder.Services.AddSingleton<IReservationNotifier, ServiceBusReservationNotifier>();
+}
+else
+{
+    builder.Services.AddSingleton<NullReservationNotifier>();
+    builder.Services.AddSingleton<IReservationNotifier>(sp => sp.GetRequiredService<NullReservationNotifier>());
+}
+
+builder.Services.AddOptions<ReservationQueueOptions>()
+    .Bind(builder.Configuration.GetSection("ReservationQueue"));
+builder.Services.AddSingleton(TimeProvider.System);
 
 var app = builder.Build();
 
@@ -100,5 +123,6 @@ app.MapDefaultEndpoints();
 app.MapEventEndpoints();
 app.MapOrderEndpoints();
 app.MapTicketEndpoints();
+app.MapQueueEndpoints();
 
 app.Run();

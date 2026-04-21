@@ -90,6 +90,16 @@ module redis 'modules/redis.bicep' = {
   }
 }
 
+module serviceBus 'modules/servicebus.bicep' = {
+  name: 'servicebus'
+  params: {
+    location: location
+    resourcePrefix: resourcePrefix
+    tags: tags
+    privateEndpointSubnetId: network.outputs.privateEndpointSubnetId
+  }
+}
+
 module aks 'modules/aks.bicep' = {
   name: 'aks'
   params: {
@@ -147,6 +157,7 @@ module identity 'modules/identity.bicep' = {
     aksOidcIssuerUrl: aks.outputs.oidcIssuerUrl
     cosmosAccountName: cosmosDb.outputs.accountName
     redisCacheName: redis.outputs.cacheName
+    serviceBusNamespaceName: serviceBus.outputs.namespaceName
   }
 }
 
@@ -173,3 +184,4 @@ output frontDoorEndpoint string = frontDoor.outputs.endpoint
 output acrLoginServer string = acr.outputs.loginServer
 output siloIdentityClientId string = identity.outputs.identityClientId
 output redisHostName string = redis.outputs.hostName
+output serviceBusEndpoint string = serviceBus.outputs.endpoint
