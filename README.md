@@ -82,3 +82,55 @@ Azure Front Door Premium acts as the global entry point, terminating TLS and rou
 
 ### Benchmarks
 
+Load tested with [`hey`](https://github.com/rakyll/hey) — 10,000 requests, 500 concurrent connections against `GET /events/{id}` through the full Azure Front Door → AKS path.
+
+#### Baseline — Synchronous (single event grain)
+
+| Metric | Value |
+|---|---|
+| **Requests/sec** | **1,796** |
+| **Total time** | 5.57s |
+| **Avg latency** | 178ms |
+| **P50 latency** | 53ms |
+| **P90 latency** | 321ms |
+| **P99 latency** | 2.46s |
+| **Fastest** | 20ms |
+| **Slowest** | 4.82s |
+| **Success rate** | 100% (10,000 × 200) |
+
+<details>
+<summary>Full output</summary>
+
+```
+Response time histogram:
+  0.020 [1]     |
+  0.499 [9320]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.979 [163]   |■
+  1.458 [99]    |
+  1.938 [127]   |■
+  2.417 [126]   |■
+  2.897 [163]   |■
+  3.376 [0]     |
+  3.856 [0]     |
+  4.335 [0]     |
+  4.815 [1]     |
+
+Latency distribution:
+  10% in 0.0308s
+  25% in 0.0398s
+  50% in 0.0526s
+  75% in 0.0718s
+  90% in 0.3209s
+  95% in 1.0518s
+  99% in 2.4570s
+
+Details (average, fastest, slowest):
+  DNS+dialup:   0.0035s, 0.0000s, 0.2812s
+  DNS-lookup:   0.0043s, 0.0000s, 1.0637s
+  req write:    0.0001s, 0.0000s, 0.0402s
+  resp wait:    0.1327s, 0.0194s, 4.7902s
+  resp read:    0.0010s, 0.0000s, 0.3861s
+```
+
+</details>
+
