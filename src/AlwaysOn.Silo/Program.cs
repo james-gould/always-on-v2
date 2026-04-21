@@ -1,4 +1,5 @@
 using AlwaysOn.Shared.Constants;
+using AlwaysOn.Silo.Caching;
 using AlwaysOn.Silo.Endpoints;
 using Azure.Identity;
 
@@ -75,6 +76,22 @@ else
             options.IsResourceCreationEnabled = isResourceCreationEnabled;
         });
     });
+}
+
+// Redis-backed read cache for GET /events/{id}. If no Redis connection string
+// is configured (e.g. integration-test mode) fall back to an in-process cache
+// so the endpoint contract is unchanged.
+var hasRedis = !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString(AspireConstants.RedisCache));
+if (hasRedis)
+{
+    builder.AddRedisClient(AspireConstants.RedisCache);
+    builder.Services.AddOptions<EventReadCacheOptions>()
+        .Bind(builder.Configuration.GetSection("EventReadCache"));
+    builder.Services.AddSingleton<IEventReadCache, RedisEventReadCache>();
+}
+else
+{
+    builder.Services.AddSingleton<IEventReadCache, InMemoryEventReadCache>();
 }
 
 var app = builder.Build();

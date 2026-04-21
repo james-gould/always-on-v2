@@ -19,6 +19,9 @@ param k8sServiceAccountName string = 'silo-sa'
 @description('Cosmos DB account name for RBAC role assignment.')
 param cosmosAccountName string
 
+@description('Redis cache name for AAD data-plane access policy assignment.')
+param redisCacheName string
+
 var identityName = '${resourcePrefix}-silo-id'
 
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
@@ -51,6 +54,23 @@ resource cosmosRbac 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@20
     roleDefinitionId: '${cosmosAccount.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
     principalId: managedIdentity.properties.principalId
     scope: cosmosAccount.id
+  }
+}
+
+// Azure Cache for Redis access-policy assignment (AAD data-plane).
+// "Data Contributor" is the built-in policy allowing read/write of keys without
+// cluster admin rights.
+resource redisCache 'Microsoft.Cache/redis@2024-11-01' existing = {
+  name: redisCacheName
+}
+
+resource redisAccessPolicy 'Microsoft.Cache/redis/accessPolicyAssignments@2024-11-01' = {
+  parent: redisCache
+  name: guid(managedIdentity.id, redisCache.id, 'Data Contributor')
+  properties: {
+    accessPolicyName: 'Data Contributor'
+    objectId: managedIdentity.properties.principalId
+    objectIdAlias: managedIdentity.name
   }
 }
 

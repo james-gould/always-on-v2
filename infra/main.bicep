@@ -80,6 +80,16 @@ module keyVault 'modules/keyvault.bicep' = {
   }
 }
 
+module redis 'modules/redis.bicep' = {
+  name: 'redis'
+  params: {
+    location: location
+    resourcePrefix: resourcePrefix
+    tags: tags
+    privateEndpointSubnetId: network.outputs.privateEndpointSubnetId
+  }
+}
+
 module aks 'modules/aks.bicep' = {
   name: 'aks'
   params: {
@@ -136,6 +146,7 @@ module identity 'modules/identity.bicep' = {
     tags: tags
     aksOidcIssuerUrl: aks.outputs.oidcIssuerUrl
     cosmosAccountName: cosmosDb.outputs.accountName
+    redisCacheName: redis.outputs.cacheName
   }
 }
 
@@ -161,3 +172,4 @@ output keyVaultName string = keyVault.outputs.vaultName
 output frontDoorEndpoint string = frontDoor.outputs.endpoint
 output acrLoginServer string = acr.outputs.loginServer
 output siloIdentityClientId string = identity.outputs.identityClientId
+output redisHostName string = redis.outputs.hostName

@@ -11,8 +11,13 @@ var cosmos = builder
 
 var db = cosmos.AddCosmosDatabase(AspireConstants.CosmosDatabase);
 
+var cache = builder
+                .AddRedis(AspireConstants.RedisCache);
+
 var silo = builder.AddProject<Projects.AlwaysOn_Silo>(AspireConstants.Silo)
        .WithReference(db)
+       .WithReference(cache)
+       .WaitFor(cache)
        .WithComputeEnvironment(k8s);
 
 if (isTestMode)
