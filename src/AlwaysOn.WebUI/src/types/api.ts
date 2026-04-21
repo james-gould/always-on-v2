@@ -50,3 +50,28 @@ export interface IssueTicketRequest {
   orderId: string
   userId: string
 }
+
+export enum QueueEntryStatus {
+  Waiting = 0,
+  Ready = 1,
+  Expired = 2,
+  Completed = 3,
+}
+
+export interface QueueEntry {
+  queueId: string
+  eventId: string
+  userId: string
+  enqueuedAtUtc: string
+  status: QueueEntryStatus
+  position: number
+  eventName: string | null
+  reservationExpiresAtUtc: string | null
+}
+
+export interface ReservationReadyPayload {
+  queueId: string
+  eventId: string
+  userId: string
+  reservationExpiresAtUtc: string
+}
