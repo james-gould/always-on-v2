@@ -74,7 +74,7 @@ internal sealed class ReservationReadyConsumer : BackgroundService
             if (message is null)
             {
                 _logger.LogWarning("Received empty reservation-ready message; dead-lettering.");
-                await args.DeadLetterMessageAsync(args.Message, "EmptyPayload", "Deserialisation returned null.").ConfigureAwait(false);
+                await args.DeadLetterMessageAsync(args.Message, "EmptyPayload", "Deserialization returned null.").ConfigureAwait(false);
                 return;
             }
 

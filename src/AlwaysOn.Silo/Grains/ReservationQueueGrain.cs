@@ -107,7 +107,7 @@ public sealed class ReservationQueueGrain : Grain, IReservationQueueGrain, IRemi
         await PromoteWaitersAsync(eventName);
 
         // Ensure the expiry sweep reminder is running.
-        await Ensure_expirySweepReminderAsync();
+        await EnsureExpirySweepReminderAsync();
 
         // Return the most recent view (may already have been promoted if the window was free).
         return (await _queueIndex.TryReadAsync(queueId)) ?? entry;
@@ -292,7 +292,7 @@ public sealed class ReservationQueueGrain : Grain, IReservationQueueGrain, IRemi
         }
     }
 
-    private async Task Ensure_expirySweepReminderAsync()
+    private async Task EnsureExpirySweepReminderAsync()
     {
         var existing = await this.GetReminder(_expirySweepReminder);
         if (existing is not null)
