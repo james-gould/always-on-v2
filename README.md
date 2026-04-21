@@ -78,4 +78,7 @@ A Standard-tier Key Vault is deployed with RBAC authorisation, soft delete (90-d
 
 Azure Front Door Premium acts as the global entry point, terminating TLS and routing traffic to the AKS internal load balancer via Private Link Service. A WAF policy runs in Prevention mode with Microsoft Default Rule Set 2.1 and Bot Manager Rule Set 1.1. A custom rate-limit rule caps requests at 1,000 per minute per client IP. Front Door is the only publicly exposed resource — all backend traffic flows over the Azure private backbone.
 
---- 
+---
+
+### Benchmarks
+

@@ -62,7 +62,7 @@ resource wafPolicy 'Microsoft.Network/FrontDoorWebApplicationFirewallPolicies@20
         {
           ruleSetType: 'Microsoft_BotManagerRuleSet'
           ruleSetVersion: '1.1'
-          ruleSetAction: 'Block'
+          ruleSetAction: 'Log'
         }
       ]
     }
@@ -73,7 +73,7 @@ resource wafPolicy 'Microsoft.Network/FrontDoorWebApplicationFirewallPolicies@20
           priority: 100
           enabledState: 'Enabled'
           ruleType: 'RateLimitRule'
-          rateLimitThreshold: 1000
+          rateLimitThreshold: 600000
           rateLimitDurationInMinutes: 1
           action: 'Block'
           matchConditions: [
@@ -125,8 +125,8 @@ resource originGroup 'Microsoft.Cdn/profiles/originGroups@2024-09-01' = {
       successfulSamplesRequired: 3
     }
     healthProbeSettings: {
-      probePath: '/'
-      probeRequestType: 'HEAD'
+      probePath: '/health'
+      probeRequestType: 'GET'
       probeProtocol: 'Http'
       probeIntervalInSeconds: 30
     }
