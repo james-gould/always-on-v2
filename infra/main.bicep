@@ -16,6 +16,9 @@ param keyVaultAdminObjectId string
 @description('Hostname of the AKS internal ingress (set after K8s ingress is deployed).')
 param originHostName string
 
+@description('Resource ID of the AKS internal load balancer frontend IP configuration. Leave empty on first deploy (before k8s services exist).')
+param internalLoadBalancerFrontendIpId string = ''
+
 var resourcePrefix = '${baseName}-${environment}'
 var tags = {
   project: 'always-on'
@@ -73,12 +76,27 @@ module acr 'modules/acr.bicep' = {
   }
 }
 
+var privateLinkServiceId = pls.?outputs.?privateLinkServiceId ?? ''
+
 module frontDoor 'modules/frontdoor.bicep' = {
   name: 'frontdoor'
   params: {
     resourcePrefix: resourcePrefix
     tags: tags
     originHostName: originHostName
+    privateLinkServiceId: privateLinkServiceId
+    privateLinkLocation: !empty(privateLinkServiceId) ? location : ''
+  }
+}
+
+module pls 'modules/pls.bicep' = if (!empty(internalLoadBalancerFrontendIpId)) {
+  name: 'pls'
+  params: {
+    location: location
+    resourcePrefix: resourcePrefix
+    tags: tags
+    plsSubnetId: network.outputs.plsSubnetId
+    loadBalancerFrontendIpConfigId: internalLoadBalancerFrontendIpId
   }
 }
 

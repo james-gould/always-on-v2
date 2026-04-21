@@ -10,6 +10,9 @@ param originHostName string
 @description('Resource ID of the Private Link Service fronting the AKS internal load balancer.')
 param privateLinkServiceId string = ''
 
+@description('Azure region of the Private Link Service (required when privateLinkServiceId is set).')
+param privateLinkLocation string = ''
+
 var profileName = '${resourcePrefix}-afd'
 var hasPrivateLink = !empty(privateLinkServiceId)
 
@@ -144,7 +147,7 @@ resource origin 'Microsoft.Cdn/profiles/originGroups/origins@2024-09-01' = {
           privateLink: {
             id: privateLinkServiceId
           }
-          privateLinkLocation: frontDoorProfile.location
+          privateLinkLocation: privateLinkLocation
           requestMessage: 'Front Door Private Link to AKS'
         }
       : null
