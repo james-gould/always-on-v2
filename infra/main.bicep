@@ -10,6 +10,26 @@ param environment string
 @description('Base name prefix for all resources.')
 param baseName string = 'alwayson'
 
+@description('Azure region for Cosmos DB (may differ from primary location for geo-redundancy).')
+param cosmosLocation string = location
+
+@description('Kubernetes version for the AKS cluster.')
+param kubernetesVersion string = '1.33'
+
+@description('VM size for AKS system node pool.')
+param aksVmSize string = 'Standard_D2s_v6'
+
+@description('Minimum node count for AKS autoscaling.')
+@minValue(1)
+param aksMinNodeCount int = 2
+
+@description('Maximum node count for AKS autoscaling.')
+@minValue(1)
+param aksMaxNodeCount int = 5
+
+@description('Maximum autoscale throughput (RU/s) for Cosmos DB.')
+param cosmosMaxThroughput int = 1000
+
 @description('Object ID of the Azure AD group or user that should have Key Vault admin access.')
 param keyVaultAdminObjectId string
 
@@ -25,6 +45,9 @@ var tags = {
   environment: environment
 }
 
+// Well-known Azure role definition IDs
+var networkContributorRoleId = '4d97b98b-1d4f-4787-a291-c67834d212e7'
+
 module network 'modules/network.bicep' = {
   name: 'network'
   params: {
@@ -37,11 +60,12 @@ module network 'modules/network.bicep' = {
 module cosmosDb 'modules/cosmos.bicep' = {
   name: 'cosmos'
   params: {
-    location: 'northeurope'
+    location: cosmosLocation
     peLocation: location
     resourcePrefix: resourcePrefix
     tags: tags
     privateEndpointSubnetId: network.outputs.privateEndpointSubnetId
+    maxThroughput: cosmosMaxThroughput
   }
 }
 
@@ -63,6 +87,10 @@ module aks 'modules/aks.bicep' = {
     resourcePrefix: resourcePrefix
     tags: tags
     aksSubnetId: network.outputs.aksSystemSubnetId
+    kubernetesVersion: kubernetesVersion
+    vmSize: aksVmSize
+    minNodeCount: aksMinNodeCount
+    maxNodeCount: aksMaxNodeCount
   }
 }
 
@@ -120,7 +148,7 @@ resource aksSubnetRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-0
   name: guid(resourceGroup().id, 'aks-system-network-contributor')
   scope: aksSystemSubnet
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4d97b98b-1d4f-4787-a291-c67834d212e7')
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', networkContributorRoleId)
     principalId: aks.outputs.clusterIdentityPrincipalId
     principalType: 'ServicePrincipal'
   }

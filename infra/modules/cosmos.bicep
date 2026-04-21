@@ -13,6 +13,12 @@ param tags object
 @description('Subnet resource ID for private endpoints.')
 param privateEndpointSubnetId string
 
+@description('Name of the Cosmos DB database.')
+param databaseName string = 'alwayson'
+
+@description('Maximum autoscale throughput (RU/s) for the database.')
+param maxThroughput int = 1000
+
 var accountName = replace('${resourcePrefix}-cosmos', '-', '')
 
 resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
@@ -40,14 +46,14 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview
 
 resource orleansDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-12-01-preview' = {
   parent: cosmosAccount
-  name: 'alwayson'
+  name: databaseName
   properties: {
     resource: {
-      id: 'alwayson'
+      id: databaseName
     }
     options: {
       autoscaleSettings: {
-        maxThroughput: 1000
+        maxThroughput: maxThroughput
       }
     }
   }

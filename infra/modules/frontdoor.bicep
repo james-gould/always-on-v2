@@ -13,6 +13,9 @@ param privateLinkServiceId string = ''
 @description('Azure region of the Private Link Service (required when privateLinkServiceId is set).')
 param privateLinkLocation string = ''
 
+@description('HTTP port of the origin.')
+param originHttpPort int = 8080
+
 var profileName = '${resourcePrefix}-afd'
 var hasPrivateLink = !empty(privateLinkServiceId)
 
@@ -135,7 +138,7 @@ resource origin 'Microsoft.Cdn/profiles/originGroups/origins@2024-09-01' = {
   name: 'aks-origin'
   properties: {
     hostName: originHostName
-    httpPort: 8080
+    httpPort: originHttpPort
     httpsPort: 443
     originHostHeader: originHostName
     priority: 1

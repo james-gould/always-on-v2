@@ -10,6 +10,20 @@ param tags object
 @description('Subnet resource ID for AKS system node pool.')
 param aksSubnetId string
 
+@description('Kubernetes version.')
+param kubernetesVersion string = '1.33'
+
+@description('VM size for the system node pool.')
+param vmSize string = 'Standard_D2s_v6'
+
+@description('Minimum node count for autoscaling.')
+@minValue(1)
+param minNodeCount int = 2
+
+@description('Maximum node count for autoscaling.')
+@minValue(1)
+param maxNodeCount int = 5
+
 var clusterName = '${resourcePrefix}-aks'
 
 resource aks 'Microsoft.ContainerService/managedClusters@2025-05-01' = {
@@ -25,7 +39,7 @@ resource aks 'Microsoft.ContainerService/managedClusters@2025-05-01' = {
   }
   properties: {
     dnsPrefix: resourcePrefix
-    kubernetesVersion: '1.33'
+    kubernetesVersion: kubernetesVersion
     enableRBAC: true
     supportPlan: 'KubernetesOfficial'
     nodeResourceGroup: 'MC_${resourceGroup().name}_${clusterName}_${location}'
@@ -39,13 +53,13 @@ resource aks 'Microsoft.ContainerService/managedClusters@2025-05-01' = {
       {
         name: 'agentpool'
         mode: 'System'
-        vmSize: 'Standard_D2s_v6'
+        vmSize: vmSize
         osSKU: 'Ubuntu'
         osType: 'Linux'
         type: 'VirtualMachineScaleSets'
-        count: 2
-        minCount: 2
-        maxCount: 5
+        count: minNodeCount
+        minCount: minNodeCount
+        maxCount: maxNodeCount
         enableAutoScaling: true
         maxPods: 110
         enableNodePublicIP: false

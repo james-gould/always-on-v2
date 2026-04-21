@@ -11,6 +11,7 @@ param tags object
 param aksKubeletPrincipalId string
 
 var registryName = replace('${resourcePrefix}acr', '-', '')
+var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
 
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: registryName
@@ -24,14 +25,13 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   }
 }
 
-// AcrPull role: 7f951dda-4ed3-4680-a7ca-43fe172d538d
 resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(acr.id, aksKubeletPrincipalId, '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+  name: guid(acr.id, aksKubeletPrincipalId, acrPullRoleId)
   scope: acr
   properties: {
     roleDefinitionId: subscriptionResourceId(
       'Microsoft.Authorization/roleDefinitions',
-      '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+      acrPullRoleId
     )
     principalId: aksKubeletPrincipalId
     principalType: 'ServicePrincipal'

@@ -13,6 +13,9 @@
     },
     "originHostName": {
       "value": "20.54.226.238"
+    },
+    "cosmosLocation": {
+      "value": "northeurope"
     }
   }
 }

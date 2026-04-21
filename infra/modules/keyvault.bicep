@@ -14,6 +14,7 @@ param privateEndpointSubnetId string
 param adminObjectId string
 
 var vaultName = replace('${resourcePrefix}-kv', '-', '')
+var keyVaultAdministratorRoleId = '00482a5a-887f-4fb3-b363-3b7fe8e74483'
 
 resource keyVault 'Microsoft.KeyVault/vaults@2024-04-01-preview' = {
   name: vaultName
@@ -38,10 +39,10 @@ resource keyVault 'Microsoft.KeyVault/vaults@2024-04-01-preview' = {
 
 // Key Vault Administrator role
 resource adminRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(keyVault.id, adminObjectId, '00482a5a-887f-4fb3-b363-3b7fe8e74483')
+  name: guid(keyVault.id, adminObjectId, keyVaultAdministratorRoleId)
   scope: keyVault
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '00482a5a-887f-4fb3-b363-3b7fe8e74483')
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultAdministratorRoleId)
     principalId: adminObjectId
     principalType: 'User'
   }
