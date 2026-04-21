@@ -11,7 +11,6 @@ param tags object
 param aksSubnetId string
 
 var clusterName = '${resourcePrefix}-aks'
-var networkContributorRoleId = '4d97b98b-1d4f-4787-a291-c67834d212e7'
 
 resource aks 'Microsoft.ContainerService/managedClusters@2025-05-01' = {
   name: clusterName
@@ -68,26 +67,6 @@ resource aks 'Microsoft.ContainerService/managedClusters@2025-05-01' = {
     nodeProvisioningProfile: {
       mode: 'Manual'
     }
-  }
-}
-
-// AKS cluster identity needs Network Contributor on the subnet to create internal load balancers
-resource aksVnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
-  name: split(aksSubnetId, '/')[8]
-}
-
-resource aksSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
-  parent: aksVnet
-  name: split(aksSubnetId, '/')[10]
-}
-
-resource subnetRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(aksSubnetId, aks.id, networkContributorRoleId)
-  scope: aksSubnet
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', networkContributorRoleId)
-    principalId: aks.identity.principalId
-    principalType: 'ServicePrincipal'
   }
 }
 

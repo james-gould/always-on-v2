@@ -94,8 +94,8 @@ resource keyVaultDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLi
 }
 
 output vnetId string = vnet.id
-output aksSystemSubnetId string = vnet.properties.subnets[0].id
-output aksGatewaySubnetId string = vnet.properties.subnets[1].id
-output aksSiloSubnetId string = vnet.properties.subnets[2].id
-output privateEndpointSubnetId string = vnet.properties.subnets[3].id
-output plsSubnetId string = vnet.properties.subnets[4].id
+output aksSystemSubnetId string = '${vnet.id}/subnets/aks-system'
+output aksGatewaySubnetId string = '${vnet.id}/subnets/aks-gateway'
+output aksSiloSubnetId string = '${vnet.id}/subnets/aks-silo'
+output privateEndpointSubnetId string = '${vnet.id}/subnets/private-endpoints'
+output plsSubnetId string = '${vnet.id}/subnets/private-link-service'

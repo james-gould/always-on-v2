@@ -111,6 +111,21 @@ module identity 'modules/identity.bicep' = {
   }
 }
 
+// AKS cluster identity needs Network Contributor on the aks-system subnet to create internal load balancers
+resource aksSystemSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: '${resourcePrefix}-vnet/aks-system'
+}
+
+resource aksSubnetRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, 'aks-system-network-contributor')
+  scope: aksSystemSubnet
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4d97b98b-1d4f-4787-a291-c67834d212e7')
+    principalId: aks.outputs.clusterIdentityPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 output aksClusterName string = aks.outputs.clusterName
 output cosmosAccountName string = cosmosDb.outputs.accountName
 output cosmosAccountEndpoint string = cosmosDb.outputs.accountEndpoint
