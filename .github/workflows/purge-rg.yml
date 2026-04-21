@@ -45,8 +45,8 @@ jobs:
           RG="rg-alwayson-${{ github.event.inputs.environment }}"
           if [ "$(az group exists --name "$RG")" = "true" ]; then
             echo "Deleting resource group '$RG'..."
-            az group delete --name "$RG" --yes --no-wait
-            echo "Deletion initiated for '$RG'."
+            az group delete --name "$RG" --yes
+            echo "Deleted resource group '$RG'."
           else
             echo "Resource group '$RG' does not exist; nothing to purge."
           fi
