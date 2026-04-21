@@ -2,6 +2,7 @@ using AlwaysOn.Shared.Constants;
 using AlwaysOn.Silo.Caching;
 using AlwaysOn.Silo.Endpoints;
 using AlwaysOn.Silo.Grains;
+using AlwaysOn.Silo.Hubs;
 using AlwaysOn.Silo.Queueing;
 using Azure.Identity;
 
@@ -106,6 +107,7 @@ if (hasServiceBus)
 {
     builder.AddAzureServiceBusClient(AspireConstants.ServiceBus);
     builder.Services.AddSingleton<IReservationNotifier, ServiceBusReservationNotifier>();
+    builder.Services.AddHostedService<ReservationReadyConsumer>();
 }
 else
 {
@@ -117,6 +119,11 @@ builder.Services.AddOptions<ReservationQueueOptions>()
     .Bind(builder.Configuration.GetSection("ReservationQueue"));
 builder.Services.AddSingleton(TimeProvider.System);
 
+// Self-hosted SignalR for pushing reservation-ready notifications to clients.
+// Hosting in-cluster (AKS) keeps the dev-ex simple — no separate Azure SignalR
+// Service or emulator to wire into the AppHost.
+builder.Services.AddSignalR();
+
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
@@ -124,5 +131,6 @@ app.MapEventEndpoints();
 app.MapOrderEndpoints();
 app.MapTicketEndpoints();
 app.MapQueueEndpoints();
+app.MapHub<QueueHub>("/hubs/queue");
 
 app.Run();
