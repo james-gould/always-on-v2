@@ -1,11 +1,14 @@
 A ramp-up project for Senior Software Engineers at Microsoft, architecturing a globally scalable low-latency API utilising:
 
-- Orleans
-- AKS (Kubernetes)
-- CosmosDB
+- Orleans 10
+- AKS (Kubernetes 1.33)
+- CosmosDB (AAD auth via workload identity)
+- Azure Container Registry
 - Azure Key Vault
-- ASP.NET Core 10
+- Azure Front Door Premium
+- ASP.NET Core 10 / .NET Aspire
 - Bicep for IaC
+- GitHub Actions CI/CD
 
 ---
 
@@ -19,7 +22,7 @@ There are two discrete runtime components and a shared library:
 
 - **Gateway** — A thin, stateless ASP.NET Core API sitting behind Azure Front Door. Handles request validation before forwarding calls into the Orleans cluster as a client. Scales horizontally with no state.
 - **Silo** — The Orleans silo hosting all grain implementations. Co-hosts ASP.NET Core for health checks and diagnostics but does not serve public traffic. Scales based on grain count and CPU utilisation.
-- **Abstractions** — A class library containing grain interfaces and shared DTOs, referenced by both the Gateway and Silo projects.
+- **Shared** — A class library containing grain interfaces, shared DTOs and constants, referenced by both the Gateway and Silo projects.
 
 #### Grain Design
 
@@ -51,27 +54,25 @@ A `/14` VNet is partitioned into dedicated subnets: one per AKS node pool (syste
 
 ##### Compute — AKS
 
-A single AKS cluster hosts three node pools:
+A single AKS cluster hosts one system node pool on the `aks-system` VNet subnet:
 
-- **System** (`Standard_D2s_v5`, 2–4 nodes) — Tainted for critical add-ons only; runs CoreDNS, kube-proxy and the secrets store CSI driver.
-- **Gateway** (`Standard_D4s_v5`, 2–20 nodes) — General-purpose pool for the stateless Gateway `Deployment`, autoscaling on CPU and request count.
-- **Silo** (`Standard_E4s_v5`, 3–15 nodes) — Memory-optimised pool for the Orleans `StatefulSet`, providing stable network identities required for cluster membership.
+- **System** (`Standard_D2s_v6`, 2–5 nodes) — Runs all workloads including the Orleans Silo deployment. Azure CNI networking, autoscaling enabled.
 
-All pools are spread across availability zones 1, 2 and 3 for zone-redundant resilience. Workload identity and OIDC issuer are enabled for keyless authentication to Azure services. The Key Vault secrets provider CSI driver rotates secrets on a two-minute polling interval. Cilium is configured as both the network plugin and policy engine. Container Insights ships logs and metrics to a Log Analytics workspace with a 30-day retention.
+The VNet also reserves `aks-gateway` and `aks-silo` subnets for future dedicated workload pools. Workload identity and OIDC issuer are enabled for keyless AAD authentication to Azure services (Cosmos DB). The cluster auto-upgrades on the `stable` channel.
 
 ##### Data — CosmosDB
 
-A serverless CosmosDB account with Session consistency hosts the `alwayson` database, pre-provisioned with three containers:
+A provisioned-autoscale CosmosDB account (1,000 RU/s max, Session consistency) in northeurope hosts the `alwayson` database with three containers:
 
 - `orleans-clustering` (partitioned on `/ClusterId`) — Silo membership table.
 - `orleans-grain-state` (partitioned on `/PartitionKey`) — Persistent grain state.
 - `orleans-reminders` (partitioned on `/PartitionKey`) — Reminder registrations.
 
-The account is accessible only via a private endpoint in the shared PE subnet; public network access is disabled entirely. Automatic failover and zone redundancy are enabled.
+The account is accessible only via a private endpoint in the shared PE subnet; public network access is disabled entirely. Local (key-based) auth is disabled — the Silo authenticates using `DefaultAzureCredential` via a User-Assigned Managed Identity with the Cosmos DB Built-in Data Contributor role, federated to the `silo-sa` Kubernetes service account through AKS workload identity. Automatic failover is enabled.
 
 ##### Secrets — Key Vault
 
-A Standard-tier Key Vault is deployed with RBAC authorisation, soft delete (90-day retention) and no public network access. AKS workloads access secrets through the CSI driver using workload identity; no connection strings are stored in application configuration.
+A Standard-tier Key Vault is deployed with RBAC authorisation, soft delete (90-day retention) and no public network access via a private endpoint in the shared PE subnet. No connection strings are stored in application configuration — Cosmos access uses AAD tokens via workload identity.
 
 ##### Edge — Azure Front Door
 
