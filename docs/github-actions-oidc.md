@@ -19,7 +19,7 @@ Three credentials are configured to cover every trigger path in the workflows:
 | Name | Subject | Purpose |
 |---|---|---|
 | `github-environment-dev` | `repo:james-gould/always-on-v2:environment:dev` | Jobs that declare `environment: dev` (deploy-infra, deploy-app, purge) |
-| `github-branch-main` | `repo:james-gould/always-on-v2:ref:refs/heads/main` | Jobs on `main` push without a GitHub environment (validate-infra) |
+| `github-branch-master` | `repo:james-gould/always-on-v2:ref:refs/heads/master` | Jobs on `master` push without a GitHub environment (validate-infra) |
 | `github-pull-request` | `repo:james-gould/always-on-v2:pull_request` | Jobs triggered by pull requests (validate-infra on PR) |
 
 All three use:
@@ -31,7 +31,7 @@ All three use:
 GitHub's OIDC token `sub` claim varies depending on the trigger and whether the job uses a GitHub environment:
 
 - A job with `environment: dev` produces `repo:<owner>/<repo>:environment:dev`
-- A push to `main` without an environment produces `repo:<owner>/<repo>:ref:refs/heads/main`
+- A push to `master` without an environment produces `repo:<owner>/<repo>:ref:refs/heads/master`
 - A PR produces `repo:<owner>/<repo>:pull_request`
 
 Azure AD matches the `sub` claim exactly, so each variant needs its own credential.
