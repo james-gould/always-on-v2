@@ -122,7 +122,7 @@ resource originGroup 'Microsoft.Cdn/profiles/originGroups@2024-09-01' = {
       successfulSamplesRequired: 3
     }
     healthProbeSettings: {
-      probePath: '/health'
+      probePath: '/'
       probeRequestType: 'HEAD'
       probeProtocol: 'Http'
       probeIntervalInSeconds: 30
@@ -135,13 +135,13 @@ resource origin 'Microsoft.Cdn/profiles/originGroups/origins@2024-09-01' = {
   name: 'aks-origin'
   properties: {
     hostName: originHostName
-    httpPort: 80
+    httpPort: 8080
     httpsPort: 443
     originHostHeader: originHostName
     priority: 1
     weight: 1000
     enabledState: 'Enabled'
-    enforceCertificateNameCheck: true
+    enforceCertificateNameCheck: false
     sharedPrivateLinkResource: hasPrivateLink
       ? {
           privateLink: {

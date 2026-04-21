@@ -49,8 +49,6 @@ kind: Service
 metadata:
   name: webui-service
   namespace: default
-  annotations:
-    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
   labels:
     app.kubernetes.io/name: alwayson-webui
     app.kubernetes.io/component: webui
