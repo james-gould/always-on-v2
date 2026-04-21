@@ -5,19 +5,10 @@ using StackExchange.Redis;
 
 namespace AlwaysOn.Silo.Queueing;
 
-internal sealed class RedisQueueIndex : IQueueIndex
+internal sealed class RedisQueueIndex(IConnectionMultiplexer redis, ILogger<RedisQueueIndex> logger) : IQueueIndex
 {
     private const string _keyPrefix = "queue:";
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
-
-    private readonly IConnectionMultiplexer _redis;
-    private readonly ILogger<RedisQueueIndex> _logger;
-
-    public RedisQueueIndex(IConnectionMultiplexer redis, ILogger<RedisQueueIndex> logger)
-    {
-        _redis = redis;
-        _logger = logger;
-    }
 
     public async Task WriteAsync(QueueEntry entry, TimeSpan ttl, CancellationToken cancellationToken = default)
     {
@@ -28,11 +19,11 @@ internal sealed class RedisQueueIndex : IQueueIndex
 
         try
         {
-            await _redis.GetDatabase().StringSetAsync(key, payload, ttl).WaitAsync(cancellationToken).ConfigureAwait(false);
+            await redis.GetDatabase().StringSetAsync(key, payload, ttl).WaitAsync(cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Failed to write queue entry {QueueId} to Redis.", entry.QueueId);
+            logger.LogWarning(ex, "Failed to write queue entry {QueueId} to Redis.", entry.QueueId);
         }
     }
 
@@ -43,17 +34,18 @@ internal sealed class RedisQueueIndex : IQueueIndex
         var key = _keyPrefix + queueId;
         try
         {
-            var value = await _redis.GetDatabase().StringGetAsync(key).WaitAsync(cancellationToken).ConfigureAwait(false);
-            if (!value.HasValue)
+            var value = await redis.GetDatabase().StringGetAsync(key).WaitAsync(cancellationToken);
+            if (value.IsNullOrEmpty)
             {
                 return null;
             }
 
-            return JsonSerializer.Deserialize<QueueEntry>((string)value!, _jsonOptions);
+            var bytes = (ReadOnlyMemory<byte>)value;
+            return JsonSerializer.Deserialize<QueueEntry>(bytes.Span, _jsonOptions);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Failed to read queue entry {QueueId} from Redis.", queueId);
+            logger.LogWarning(ex, "Failed to read queue entry {QueueId} from Redis.", queueId);
             return null;
         }
     }
@@ -64,11 +56,11 @@ internal sealed class RedisQueueIndex : IQueueIndex
 
         try
         {
-            await _redis.GetDatabase().KeyDeleteAsync(_keyPrefix + queueId).WaitAsync(cancellationToken).ConfigureAwait(false);
+            await redis.GetDatabase().KeyDeleteAsync(_keyPrefix + queueId).WaitAsync(cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Failed to delete queue entry {QueueId} from Redis.", queueId);
+            logger.LogWarning(ex, "Failed to delete queue entry {QueueId} from Redis.", queueId);
         }
     }
 }

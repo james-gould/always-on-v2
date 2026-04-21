@@ -20,23 +20,14 @@ public sealed class EventReadCacheOptions
 /// (<c>POST /events</c>) call <see cref="InvalidateAsync"/> so the next read
 /// repopulates from the grain.
 /// </summary>
-internal sealed class RedisEventReadCache : IEventReadCache
+internal sealed class RedisEventReadCache(
+    IConnectionMultiplexer redis,
+    IOptions<EventReadCacheOptions> options,
+    ILogger<RedisEventReadCache> logger) : IEventReadCache
 {
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly IConnectionMultiplexer _redis;
-    private readonly EventReadCacheOptions _options;
-    private readonly ILogger<RedisEventReadCache> _logger;
-
-    public RedisEventReadCache(
-        IConnectionMultiplexer redis,
-        IOptions<EventReadCacheOptions> options,
-        ILogger<RedisEventReadCache> logger)
-    {
-        _redis = redis;
-        _options = options.Value;
-        _logger = logger;
-    }
+    private readonly EventReadCacheOptions _options = options.Value;
 
     public async Task<EventDetails> GetOrLoadAsync(string eventId, Func<Task<EventDetails>> loader, CancellationToken cancellationToken = default)
     {
@@ -44,35 +35,31 @@ internal sealed class RedisEventReadCache : IEventReadCache
         ArgumentNullException.ThrowIfNull(loader);
 
         var key = BuildKey(eventId);
-        var db = _redis.GetDatabase();
+        var db = redis.GetDatabase();
 
         try
         {
-            var cached = await db.StringGetAsync(key).WaitAsync(cancellationToken).ConfigureAwait(false);
-            if (cached.HasValue)
+            var cached = await db.StringGetAsync(key).WaitAsync(cancellationToken);
+            if (TryDeserialize(cached, out var hit))
             {
-                var hit = JsonSerializer.Deserialize<EventDetails>((string)cached!, _jsonOptions);
-                if (hit is not null)
-                {
-                    return hit;
-                }
+                return hit;
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Redis read failed for event {EventId}; falling back to grain.", eventId);
+            logger.LogWarning(ex, "Redis read failed for event {EventId}; falling back to grain.", eventId);
         }
 
-        var loaded = await loader().ConfigureAwait(false);
+        var loaded = await loader();
 
         try
         {
             var payload = JsonSerializer.Serialize(loaded, _jsonOptions);
-            await db.StringSetAsync(key, payload, _options.Ttl).WaitAsync(cancellationToken).ConfigureAwait(false);
+            await db.StringSetAsync(key, payload, _options.Ttl).WaitAsync(cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Redis write failed for event {EventId}; continuing without caching.", eventId);
+            logger.LogWarning(ex, "Redis write failed for event {EventId}; continuing without caching.", eventId);
         }
 
         return loaded;
@@ -82,18 +69,37 @@ internal sealed class RedisEventReadCache : IEventReadCache
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
 
-        var key = BuildKey(eventId);
-        var db = _redis.GetDatabase();
-
         try
         {
-            await db.KeyDeleteAsync(key).WaitAsync(cancellationToken).ConfigureAwait(false);
+            await redis.GetDatabase().KeyDeleteAsync(BuildKey(eventId)).WaitAsync(cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Redis invalidate failed for event {EventId}.", eventId);
+            logger.LogWarning(ex, "Redis invalidate failed for event {EventId}.", eventId);
         }
     }
 
     private string BuildKey(string eventId) => _options.KeyPrefix + eventId;
+
+    private static bool TryDeserialize(RedisValue value, out EventDetails result)
+    {
+        result = default!;
+
+        if (value.IsNullOrEmpty)
+        {
+            return false;
+        }
+
+        // RedisValue implicitly converts to ReadOnlyMemory<byte>, avoiding an
+        // unnecessary string allocation and the c-style cast.
+        var bytes = (ReadOnlyMemory<byte>)value;
+        var parsed = JsonSerializer.Deserialize<EventDetails>(bytes.Span, _jsonOptions);
+        if (parsed is null)
+        {
+            return false;
+        }
+
+        result = parsed;
+        return true;
+    }
 }

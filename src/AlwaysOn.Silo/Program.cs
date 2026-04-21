@@ -1,9 +1,6 @@
 using AlwaysOn.Shared.Constants;
-using AlwaysOn.Silo.Caching;
 using AlwaysOn.Silo.Endpoints;
-using AlwaysOn.Silo.Grains;
-using AlwaysOn.Silo.Hubs;
-using AlwaysOn.Silo.Queueing;
+using AlwaysOn.Silo.Extensions;
 using Azure.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -82,47 +79,17 @@ else
 }
 
 // Redis-backed read cache for GET /events/{id}. If no Redis connection string
-// is configured (e.g. integration-test mode) fall back to an in-process cache
-// so the endpoint contract is unchanged.
-var hasRedis = !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString(AspireConstants.RedisCache));
-if (hasRedis)
-{
-    builder.AddRedisClient(AspireConstants.RedisCache);
-    builder.Services.AddOptions<EventReadCacheOptions>()
-        .Bind(builder.Configuration.GetSection("EventReadCache"));
-    builder.Services.AddSingleton<IEventReadCache, RedisEventReadCache>();
-    builder.Services.AddSingleton<IQueueIndex, RedisQueueIndex>();
-}
-else
-{
-    builder.Services.AddSingleton<IEventReadCache, InMemoryEventReadCache>();
-    builder.Services.AddSingleton<IQueueIndex, InMemoryQueueIndex>();
-}
+// is configured (e.g. integration-test mode) this falls back to an in-process
+// cache so the endpoint contract is unchanged.
+builder.AddEventReadCache();
 
-// Service Bus reservation notifier. Falls back to an in-memory no-op when not
-// configured so integration tests run without a broker.
-var hasServiceBus = !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString(AspireConstants.ServiceBus))
-    || !string.IsNullOrWhiteSpace(builder.Configuration[$"ConnectionStrings:{AspireConstants.ServiceBus}"]);
-if (hasServiceBus)
-{
-    builder.AddAzureServiceBusClient(AspireConstants.ServiceBus);
-    builder.Services.AddSingleton<IReservationNotifier, ServiceBusReservationNotifier>();
-    builder.Services.AddHostedService<ReservationReadyConsumer>();
-}
-else
-{
-    builder.Services.AddSingleton<NullReservationNotifier>();
-    builder.Services.AddSingleton<IReservationNotifier>(sp => sp.GetRequiredService<NullReservationNotifier>());
-}
+// Service Bus reservation notifier + SignalR-fanout consumer. Falls back to an
+// in-memory no-op notifier when not configured so integration tests run
+// without a broker.
+builder.AddReservationMessaging();
 
-builder.Services.AddOptions<ReservationQueueOptions>()
-    .Bind(builder.Configuration.GetSection("ReservationQueue"));
-builder.Services.AddSingleton(TimeProvider.System);
-
-// Self-hosted SignalR for pushing reservation-ready notifications to clients.
-// Hosting in-cluster (AKS) keeps the dev-ex simple — no separate Azure SignalR
-// Service or emulator to wire into the AppHost.
-builder.Services.AddSignalR();
+// Queue grain options, shared TimeProvider, and the self-hosted SignalR hub.
+builder.AddReservationQueueCore();
 
 var app = builder.Build();
 
@@ -131,6 +98,6 @@ app.MapEventEndpoints();
 app.MapOrderEndpoints();
 app.MapTicketEndpoints();
 app.MapQueueEndpoints();
-app.MapHub<QueueHub>("/hubs/queue");
+app.MapQueueHub();
 
 app.Run();

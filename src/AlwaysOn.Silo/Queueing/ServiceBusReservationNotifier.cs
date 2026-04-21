@@ -4,18 +4,13 @@ using Azure.Messaging.ServiceBus;
 
 namespace AlwaysOn.Silo.Queueing;
 
-internal sealed class ServiceBusReservationNotifier : IReservationNotifier, IAsyncDisposable
+internal sealed class ServiceBusReservationNotifier(
+    ServiceBusClient client,
+    ILogger<ServiceBusReservationNotifier> logger) : IReservationNotifier, IAsyncDisposable
 {
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly ServiceBusSender _sender;
-    private readonly ILogger<ServiceBusReservationNotifier> _logger;
-
-    public ServiceBusReservationNotifier(ServiceBusClient client, ILogger<ServiceBusReservationNotifier> logger)
-    {
-        _sender = client.CreateSender(AspireConstants.ReservationsQueue);
-        _logger = logger;
-    }
+    private readonly ServiceBusSender _sender = client.CreateSender(AspireConstants.ReservationsQueue);
 
     public async Task PublishReadyAsync(ReservationReadyMessage message, CancellationToken cancellationToken = default)
     {
@@ -37,11 +32,11 @@ internal sealed class ServiceBusReservationNotifier : IReservationNotifier, IAsy
 
         try
         {
-            await _sender.SendMessageAsync(sbMessage, cancellationToken).ConfigureAwait(false);
+            await _sender.SendMessageAsync(sbMessage, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Failed to publish reservation-ready message for queue {QueueId}.", message.QueueId);
+            logger.LogError(ex, "Failed to publish reservation-ready message for queue {QueueId}.", message.QueueId);
             throw;
         }
     }
