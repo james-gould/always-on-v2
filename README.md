@@ -42,11 +42,11 @@ Orleans guarantees single-threaded execution per grain, eliminating the need for
 
 #### Reservation Queue
 
-High-demand on-sales are absorbed by a Service Bus–driven reservation queue rather than a synchronous HTTP facade:
+High-demand on-sales are absorbed by an Event Grid–driven reservation queue rather than a synchronous HTTP facade:
 
 - `ReservationQueueGrain` (one per event) owns the FIFO waiting list and a bounded pool of concurrent reservation holders.
-- Requests `POST /events/{id}/queue` enqueue the user; as slots open, the grain promotes the next waiter, publishes a `ReservationReadyMessage` to the `reservations-ready` Service Bus queue and mirrors the state into Redis (`queue:{queueId}`).
-- An in-silo SignalR hub (`/hubs/queue`) subscribes each connected user to a per-user group. The `ReservationReadyConsumer` background service receives SB messages and pushes `ReservationReady` to the correct group, so the client's WebSocket promotes instantly instead of waiting for the next `/myqueue` poll.
+- Requests `POST /events/{id}/queue` enqueue the user; as slots open, the grain promotes the next waiter, publishes a `ReservationReadyMessage` to the `reservations` Event Grid namespace topic and mirrors the state into Redis (`queue:{queueId}`).
+- An in-silo SignalR hub (`/hubs/queue`) subscribes each connected user to a per-user group. The `ReservationReadyConsumer` background service pulls events from the `reservations-ready` subscription and pushes `ReservationReady` to the correct group, so the client's WebSocket promotes instantly instead of waiting for the next `/myqueue` poll.
 - Reservations expire after **3 minutes** via an Orleans reminder on the queue grain; the slot returns to the pool and the next waiter is promoted.
 - `GET /myqueue/{queueId}` reads from the Redis mirror, so queue-position polling is cheap under load.
 
@@ -92,9 +92,9 @@ A Standard-tier Key Vault is deployed with RBAC authorisation, soft delete (90-d
 
 A Standard-tier Redis instance with `disableAccessKeyAuthentication: true` (AAD-only), `publicNetworkAccess: Disabled` and TLS 1.2 minimum. The Silo's managed identity is granted the built-in `Data Contributor` access policy; traffic is routed via a private endpoint in the shared PE subnet with the `privatelink.redis.cache.windows.net` DNS zone linked to the VNet. Used for the `GET /events/{id}` read cache and the queue-position mirror.
 
-##### Messaging — Azure Service Bus
+##### Messaging — Azure Event Grid
 
-A Premium-tier Service Bus namespace (Premium is required for VNet Private Link) with `disableLocalAuth: true`, public access disabled and TLS 1.2 minimum. A single `reservations-ready` queue with dead-lettering on expiry carries reservation-ready events produced by `ReservationQueueGrain` and consumed by the in-silo `ReservationReadyConsumer`, which fans them out over SignalR. The Silo identity is granted the `Azure Service Bus Data Owner` role at namespace scope; traffic flows via a private endpoint with `privatelink.servicebus.windows.net`.
+A Standard-tier Event Grid Namespace with public access disabled and TLS 1.2 minimum. A `reservations` namespace topic with a `reservations-ready` queue event subscription carries reservation-ready events produced by `ReservationQueueGrain` and consumed by the in-silo `ReservationReadyConsumer` via pull delivery, which fans them out over SignalR. The Silo identity is granted the `EventGrid Data Sender` and `EventGrid Data Receiver` roles at namespace scope; traffic flows via a private endpoint with `privatelink.eventgrid.azure.net`.
 
 ##### Edge — Azure Front Door
 

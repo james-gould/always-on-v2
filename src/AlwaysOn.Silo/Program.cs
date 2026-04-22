@@ -83,7 +83,7 @@ else
 // cache so the endpoint contract is unchanged.
 builder.AddEventReadCache();
 
-// Service Bus reservation notifier + SignalR-fanout consumer. Falls back to an
+// Event Grid reservation notifier + SignalR-fanout consumer. Falls back to an
 // in-memory no-op notifier when not configured so integration tests run
 // without a broker.
 builder.AddReservationMessaging();

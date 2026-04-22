@@ -111,15 +111,15 @@ resource redisDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks
   }
 }
 
-resource serviceBusDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-  name: 'privatelink.servicebus.windows.net'
+resource eventGridDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
+  name: 'privatelink.eventgrid.azure.net'
   location: 'global'
   tags: tags
 }
 
-resource serviceBusDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
-  parent: serviceBusDnsZone
-  name: '${vnetName}-sb-link'
+resource eventGridDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
+  parent: eventGridDnsZone
+  name: '${vnetName}-eg-link'
   location: 'global'
   properties: {
     virtualNetwork: {

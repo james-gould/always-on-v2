@@ -22,8 +22,8 @@ param cosmosAccountName string
 @description('Redis cache name for AAD data-plane access policy assignment.')
 param redisCacheName string
 
-@description('Service Bus namespace name for AAD data-plane RBAC assignment.')
-param serviceBusNamespaceName string
+@description('Event Grid namespace name for AAD data-plane RBAC assignment.')
+param eventGridNamespaceName string
 
 var identityName = '${resourcePrefix}-silo-id'
 
@@ -77,19 +77,30 @@ resource redisAccessPolicy 'Microsoft.Cache/redis/accessPolicyAssignments@2024-1
   }
 }
 
-// Azure Service Bus Data Owner role: allows Send, Receive and management of
-// queues used by the reservation flow. Role definition ID is well-known.
-var serviceBusDataOwnerRoleId = '090c5cfd-751d-490a-894a-3ce6f1109419'
+// Event Grid Data Sender + Data Receiver roles: allow publishing to namespace
+// topics and consuming via pull delivery. Role definition IDs are well-known.
+var eventGridDataSenderRoleId = 'd5a91429-5739-47e2-a06b-3470a27159e7'
+var eventGridDataReceiverRoleId = '78cbd9e7-9798-4e2e-9b5a-547d9ebb31fb'
 
-resource serviceBus 'Microsoft.ServiceBus/namespaces@2024-01-01' existing = {
-  name: serviceBusNamespaceName
+resource eventGridNamespace 'Microsoft.EventGrid/namespaces@2024-06-01-preview' existing = {
+  name: eventGridNamespaceName
 }
 
-resource serviceBusRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: serviceBus
-  name: guid(managedIdentity.id, serviceBus.id, serviceBusDataOwnerRoleId)
+resource eventGridSenderRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: eventGridNamespace
+  name: guid(managedIdentity.id, eventGridNamespace.id, eventGridDataSenderRoleId)
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', serviceBusDataOwnerRoleId)
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', eventGridDataSenderRoleId)
+    principalId: managedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource eventGridReceiverRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: eventGridNamespace
+  name: guid(managedIdentity.id, eventGridNamespace.id, eventGridDataReceiverRoleId)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', eventGridDataReceiverRoleId)
     principalId: managedIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }

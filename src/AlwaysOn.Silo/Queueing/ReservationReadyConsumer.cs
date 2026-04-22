@@ -1,92 +1,76 @@
 using System.Text.Json;
-using AlwaysOn.Shared.Constants;
 using AlwaysOn.Silo.Hubs;
-using Azure.Messaging.ServiceBus;
+using Azure.Messaging.EventGrid.Namespaces;
 using Microsoft.AspNetCore.SignalR;
 
 namespace AlwaysOn.Silo.Queueing;
 
 /// <summary>
-/// Background consumer of the reservations-ready Service Bus queue. When a
-/// <see cref="ReservationReadyMessage"/> arrives, the consumer pushes it to the
-/// per-user SignalR group so the client's WebSocket promotes immediately,
-/// rather than waiting for the next /myqueue poll.
+/// Background consumer that pulls events from the Event Grid namespace topic
+/// subscription using pull delivery. When a <see cref="ReservationReadyMessage"/>
+/// arrives, the consumer pushes it to the per-user SignalR group so the client's
+/// WebSocket promotes immediately, rather than waiting for the next /myqueue poll.
 /// </summary>
 internal sealed class ReservationReadyConsumer(
-    ServiceBusClient client,
+    EventGridReceiverClient receiverClient,
     IHubContext<QueueHub> hubContext,
     ILogger<ReservationReadyConsumer> logger) : BackgroundService
 {
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
-    private ServiceBusProcessor? _processor;
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _processor = client.CreateProcessor(AspireConstants.ReservationsQueue, new ServiceBusProcessorOptions
+        while (!stoppingToken.IsCancellationRequested)
         {
-            AutoCompleteMessages = false,
-            MaxConcurrentCalls = 8,
-        });
-
-        _processor.ProcessMessageAsync += HandleMessageAsync;
-        _processor.ProcessErrorAsync += HandleErrorAsync;
-
-        try
-        {
-            await _processor.StartProcessingAsync(stoppingToken);
-            await Task.Delay(Timeout.Infinite, stoppingToken);
-        }
-        catch (OperationCanceledException)
-        {
-            // Normal shutdown.
-        }
-        finally
-        {
-            if (_processor is not null)
+            try
             {
-                await _processor.StopProcessingAsync(CancellationToken.None);
-                await _processor.DisposeAsync();
-                _processor = null;
+                ReceiveResult result = await receiverClient.ReceiveAsync(
+                    maxEvents: 10,
+                    maxWaitTime: TimeSpan.FromSeconds(30),
+                    stoppingToken);
+
+                foreach (var detail in result.Details)
+                {
+                    await ProcessEventAsync(detail, stoppingToken);
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error receiving events from Event Grid.");
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
     }
 
-    private async Task HandleMessageAsync(ProcessMessageEventArgs args)
+    private async Task ProcessEventAsync(ReceiveDetails detail, CancellationToken ct)
     {
+        var lockToken = detail.BrokerProperties.LockToken;
+
         try
         {
-            var message = JsonSerializer.Deserialize<ReservationReadyMessage>(
-                args.Message.Body.ToString(),
-                _jsonOptions);
+            var message = detail.Event.Data?.ToObjectFromJson<ReservationReadyMessage>(_jsonOptions);
 
             if (message is null)
             {
-                logger.LogWarning("Received empty reservation-ready message; dead-lettering.");
-                await args.DeadLetterMessageAsync(args.Message, "EmptyPayload", "Deserialization returned null.");
+                logger.LogWarning("Received empty reservation-ready event; rejecting.");
+                await receiverClient.RejectAsync([lockToken], ct);
                 return;
             }
 
             await hubContext.Clients
                 .Group(QueueHub.GroupName(message.UserId))
-                .SendAsync("ReservationReady", message, args.CancellationToken);
+                .SendAsync("ReservationReady", message, ct);
 
-            await args.CompleteMessageAsync(args.Message);
+            await receiverClient.AcknowledgeAsync([lockToken], ct);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to process reservation-ready message {MessageId}.", args.Message.MessageId);
-            await args.AbandonMessageAsync(args.Message);
+            logger.LogError(ex, "Failed to process reservation-ready event; releasing for redelivery.");
+            await receiverClient.ReleaseAsync([lockToken], null, ct);
         }
-    }
-
-    private Task HandleErrorAsync(ProcessErrorEventArgs args)
-    {
-        logger.LogError(
-            args.Exception,
-            "Service Bus processor error for {Entity} ({Source}).",
-            args.EntityPath,
-            args.ErrorSource);
-        return Task.CompletedTask;
     }
 }

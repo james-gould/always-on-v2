@@ -5,7 +5,7 @@ namespace AlwaysOn.Shared.Grains;
 /// <summary>
 /// One grain per event. Acts as the FIFO coordinator for ticket-reservation
 /// slots: users enqueue, and the grain promotes them to the "ready" state as
-/// slots free up, publishing a message on the reservations Service Bus queue
+/// slots free up, publishing an event to the Event Grid namespace topic
 /// so downstream consumers (SignalR notifier) can push the update.
 /// </summary>
 public interface IReservationQueueGrain : IGrainWithStringKey

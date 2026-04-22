@@ -15,6 +15,7 @@ public sealed class AspireConstants
 
     public const string RedisCache = "cache";
 
-    public const string ServiceBus = "servicebus";
-    public const string ReservationsQueue = "reservations-ready";
+    public const string EventGrid = "eventgrid";
+    public const string EventGridTopic = "reservations";
+    public const string ReservationsSubscription = "reservations-ready";
 }

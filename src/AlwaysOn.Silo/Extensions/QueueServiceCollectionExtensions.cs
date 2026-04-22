@@ -3,12 +3,14 @@ using AlwaysOn.Silo.Caching;
 using AlwaysOn.Silo.Grains;
 using AlwaysOn.Silo.Hubs;
 using AlwaysOn.Silo.Queueing;
+using Azure.Identity;
+using Azure.Messaging.EventGrid.Namespaces;
 
 namespace AlwaysOn.Silo.Extensions;
 
 /// <summary>
-/// Wires up the event-driven queue stack (Redis cache + queue index, Service
-/// Bus notifier + consumer, SignalR hub) on the silo. Keeps <c>Program.cs</c>
+/// Wires up the event-driven queue stack (Redis cache + queue index, Event Grid
+/// notifier + consumer, SignalR hub) on the silo. Keeps <c>Program.cs</c>
 /// focused on Orleans bootstrap.
 /// </summary>
 internal static class QueueServiceCollectionExtensions
@@ -42,18 +44,24 @@ internal static class QueueServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Registers the Service Bus notifier + background consumer when a Service
-    /// Bus connection string is configured, or a no-op notifier otherwise.
+    /// Registers the Event Grid notifier + background consumer when an Event
+    /// Grid connection string is configured, or a no-op notifier otherwise.
     /// </summary>
     public static IHostApplicationBuilder AddReservationMessaging(this IHostApplicationBuilder builder)
     {
-        var hasServiceBus = !string.IsNullOrWhiteSpace(
-            builder.Configuration.GetConnectionString(AspireConstants.ServiceBus));
+        var eventGridEndpoint = builder.Configuration.GetConnectionString(AspireConstants.EventGrid);
 
-        if (hasServiceBus)
+        if (!string.IsNullOrWhiteSpace(eventGridEndpoint))
         {
-            builder.AddAzureServiceBusClient(AspireConstants.ServiceBus);
-            builder.Services.AddSingleton<IReservationNotifier, ServiceBusReservationNotifier>();
+            var endpoint = new Uri(eventGridEndpoint);
+            var credential = new DefaultAzureCredential();
+
+            builder.Services.AddSingleton(
+                new EventGridSenderClient(endpoint, AspireConstants.EventGridTopic, credential));
+            builder.Services.AddSingleton(
+                new EventGridReceiverClient(endpoint, AspireConstants.EventGridTopic, AspireConstants.ReservationsSubscription, credential));
+
+            builder.Services.AddSingleton<IReservationNotifier, EventGridReservationNotifier>();
             builder.Services.AddHostedService<ReservationReadyConsumer>();
         }
         else
