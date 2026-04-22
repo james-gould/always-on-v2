@@ -125,7 +125,7 @@ resource originGroup 'Microsoft.Cdn/profiles/originGroups@2024-09-01' = {
       successfulSamplesRequired: 3
     }
     healthProbeSettings: {
-      probePath: '/health'
+      probePath: '/alive'
       probeRequestType: 'GET'
       probeProtocol: 'Http'
       probeIntervalInSeconds: 30

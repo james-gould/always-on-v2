@@ -249,12 +249,17 @@ foreach ($doc in $documents) {
             "`$1  annotations:`n    service.beta.kubernetes.io/azure-load-balancer-internal: `"true`"`n"
     }
 
-    # Patch silo-deployment: add serviceAccountName and workload identity label
+    # Patch silo-deployment: add serviceAccountName, workload identity label, and probes
     if ($trimmed -match 'kind:\s*"Deployment"' -and $trimmed -match 'name:\s*"silo-deployment"') {
         # Add workload identity label to pod template labels
         $trimmed = $trimmed -replace `
             '(app\.kubernetes\.io/instance:\s*"alwayson"\n\s*spec:\n\s*containers:)', `
             ('app.kubernetes.io/instance: "alwayson"' + "`n" + '        azure.workload.identity/use: "true"' + "`n" + '    spec:' + "`n" + '      serviceAccountName: "silo-sa"' + "`n" + '      containers:')
+
+        # Add readiness and liveness probes to the first container
+        $trimmed = $trimmed -replace `
+            '(ports:\s*\n(\s*- containerPort: \d+\n)+)', `
+            ("`$1" + '          readinessProbe:' + "`n" + '            httpGet:' + "`n" + '              path: /health' + "`n" + '              port: 8080' + "`n" + '            initialDelaySeconds: 15' + "`n" + '            periodSeconds: 10' + "`n" + '          livenessProbe:' + "`n" + '            httpGet:' + "`n" + '              path: /alive' + "`n" + '              port: 8080' + "`n" + '            initialDelaySeconds: 15' + "`n" + '            periodSeconds: 30' + "`n")
     }
 
     Set-Content (Join-Path $outputDir "manifest-$docIndex.yaml") -Value $trimmed -Encoding utf8
