@@ -240,13 +240,10 @@ foreach ($doc in $documents) {
         $trimmed = $trimmed -replace '(ConnectionStrings__cache:.*)', "`$1`n  ConnectionStrings__eventgrid: `"$eventGridEndpoint`""
     }
 
-    # Patch silo-service: ClusterIP → internal LoadBalancer
+    # Patch silo-service: ClusterIP → external LoadBalancer
+    # AFD reaches the origin directly via public IP (no Private Link Service configured).
     if ($trimmed -match 'name:\s*"silo-service"' -and $trimmed -match 'type:\s*"ClusterIP"') {
         $trimmed = $trimmed -replace 'type:\s*"ClusterIP"', 'type: "LoadBalancer"'
-        # Insert annotation after the labels block in metadata
-        $trimmed = $trimmed -replace `
-            '(metadata:\s*\n\s*name:\s*"silo-service"\n)', `
-            "`$1  annotations:`n    service.beta.kubernetes.io/azure-load-balancer-internal: `"true`"`n"
     }
 
     # Patch silo-deployment: add serviceAccountName, workload identity label, and probes
@@ -271,6 +268,21 @@ Write-Host "  Rendered $docIndex manifest(s)"
 kubectl apply -f $outputDir --recursive
 if ($LASTEXITCODE -ne 0) { Write-Error 'kubectl apply failed.' }
 
+# Wait for the LoadBalancer external IP to be assigned
+Write-Host "`nWaiting for silo-service external IP..." -ForegroundColor Cyan
+$externalIp = $null
+for ($i = 0; $i -lt 30; $i++) {
+    $externalIp = kubectl get svc silo-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
+    if ($externalIp) { break }
+    Start-Sleep -Seconds 10
+}
+
 Write-Host "`nDeployment complete." -ForegroundColor Green
 Write-Host "  Image : $fullImage"
 Write-Host "  Chart : $baseDir"
+if ($externalIp) {
+    Write-Host "  Silo LB IP: $externalIp" -ForegroundColor Yellow
+    Write-Host "  If this IP differs from the AFD origin, update 'originHostName' in main.bicepparam.dev.json and redeploy infra." -ForegroundColor Yellow
+} else {
+    Write-Host "  WARNING: Could not determine silo-service external IP. Check 'kubectl get svc silo-service'." -ForegroundColor Red
+}
