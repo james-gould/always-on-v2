@@ -105,7 +105,6 @@ jobs:
 
       - name: Deploy Bicep
         id: bicep
-        timeout-minutes: 15
         run: |
           RG="rg-alwayson-${TARGET_ENVIRONMENT}"
           az deployment group create \
