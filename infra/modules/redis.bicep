@@ -20,7 +20,7 @@ param family string = 'C'
 
 @description('Redis SKU name.')
 @allowed(['Basic', 'Standard', 'Premium'])
-param skuName string = 'Standard'
+param skuName string = 'Basic'
 
 var cacheName = '${resourcePrefix}-redis'
 

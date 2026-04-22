@@ -105,12 +105,19 @@ jobs:
 
       - name: Deploy Bicep
         id: bicep
+        timeout-minutes: 15
         run: |
           RG="rg-alwayson-${TARGET_ENVIRONMENT}"
-          RESULT=$(az deployment group create \
+          az deployment group create \
             --resource-group "$RG" \
             --template-file infra/main.bicep \
             --parameters "@infra/main.bicepparam.${TARGET_ENVIRONMENT}.json" \
+            --name main \
+            --output table
+
+          RESULT=$(az deployment group show \
+            --resource-group "$RG" \
+            --name main \
             --query "properties.outputs" -o json)
 
           echo "acrLoginServer=$(echo "$RESULT" | jq -r '.acrLoginServer.value')" >> "$GITHUB_OUTPUT"
