@@ -28,7 +28,6 @@ resource eventGridNamespace 'Microsoft.EventGrid/namespaces@2024-06-01-preview' 
   }
   properties: {
     publicNetworkAccess: 'Disabled'
-    minimumTlsVersionAllowed: '1.2'
     isZoneRedundant: false
   }
 }
