@@ -93,6 +93,42 @@ resource keyVaultDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLi
   }
 }
 
+resource redisDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
+  name: 'privatelink.redis.cache.windows.net'
+  location: 'global'
+  tags: tags
+}
+
+resource redisDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
+  parent: redisDnsZone
+  name: '${vnetName}-redis-link'
+  location: 'global'
+  properties: {
+    virtualNetwork: {
+      id: vnet.id
+    }
+    registrationEnabled: false
+  }
+}
+
+resource serviceBusDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
+  name: 'privatelink.servicebus.windows.net'
+  location: 'global'
+  tags: tags
+}
+
+resource serviceBusDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
+  parent: serviceBusDnsZone
+  name: '${vnetName}-sb-link'
+  location: 'global'
+  properties: {
+    virtualNetwork: {
+      id: vnet.id
+    }
+    registrationEnabled: false
+  }
+}
+
 output vnetId string = vnet.id
 output aksSystemSubnetId string = '${vnet.id}/subnets/aks-system'
 output aksGatewaySubnetId string = '${vnet.id}/subnets/aks-gateway'

@@ -1,5 +1,6 @@
 using AlwaysOn.Shared.Constants;
 using AlwaysOn.Silo.Endpoints;
+using AlwaysOn.Silo.Extensions;
 using Azure.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -77,11 +78,26 @@ else
     });
 }
 
+// Redis-backed read cache for GET /events/{id}. If no Redis connection string
+// is configured (e.g. integration-test mode) this falls back to an in-process
+// cache so the endpoint contract is unchanged.
+builder.AddEventReadCache();
+
+// Service Bus reservation notifier + SignalR-fanout consumer. Falls back to an
+// in-memory no-op notifier when not configured so integration tests run
+// without a broker.
+builder.AddReservationMessaging();
+
+// Queue grain options, shared TimeProvider, and the self-hosted SignalR hub.
+builder.AddReservationQueueCore();
+
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
 app.MapEventEndpoints();
 app.MapOrderEndpoints();
 app.MapTicketEndpoints();
+app.MapQueueEndpoints();
+app.MapQueueHub();
 
 app.Run();

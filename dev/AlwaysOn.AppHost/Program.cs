@@ -11,8 +11,21 @@ var cosmos = builder
 
 var db = cosmos.AddCosmosDatabase(AspireConstants.CosmosDatabase);
 
+var cache = builder
+                .AddRedis(AspireConstants.RedisCache);
+
+var serviceBus = builder
+                .AddAzureServiceBus(AspireConstants.ServiceBus)
+                .RunAsEmulator();
+
+serviceBus.AddServiceBusQueue(AspireConstants.ReservationsQueue);
+
 var silo = builder.AddProject<Projects.AlwaysOn_Silo>(AspireConstants.Silo)
        .WithReference(db)
+       .WithReference(cache)
+       .WithReference(serviceBus)
+       .WaitFor(cache)
+       .WaitFor(serviceBus)
        .WithComputeEnvironment(k8s);
 
 if (isTestMode)

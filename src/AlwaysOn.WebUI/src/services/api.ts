@@ -5,6 +5,7 @@ import type {
   CreateOrderRequest,
   CreateOrderResponse,
   TicketDetails,
+  QueueEntry,
 } from '@/types/api'
 
 const BASE = '/api'
@@ -34,5 +35,18 @@ export const api = {
   },
   tickets: {
     get: (ticketId: string) => request<TicketDetails>(`/tickets/${ticketId}`),
+  },
+  queue: {
+    enqueue: (eventId: string, userId: string) =>
+      request<QueueEntry>(`/events/${eventId}/queue`, {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      }),
+    my: (queueId: string) => request<QueueEntry>(`/myqueue/${queueId}`),
+    release: (queueId: string, completed: boolean) =>
+      request<QueueEntry>(`/myqueue/${queueId}/release`, {
+        method: 'POST',
+        body: JSON.stringify({ completed }),
+      }),
   },
 }

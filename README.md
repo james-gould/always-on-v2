@@ -40,6 +40,20 @@ Orleans guarantees single-threaded execution per grain, eliminating the need for
 3. The Gateway creates an `OrderGrain`, which transitions to `SeatsHeld` and registers an expiry reminder.
 4. On payment, the OrderGrain calls the payment provider, then makes grain-to-grain calls to `SectionGrain.ConfirmSeatAsync` and `UserGrain.AddOrderAsync` — no HTTP, no serialisation, just in-memory routing within the cluster.
 
+#### Reservation Queue
+
+High-demand on-sales are absorbed by a Service Bus–driven reservation queue rather than a synchronous HTTP facade:
+
+- `ReservationQueueGrain` (one per event) owns the FIFO waiting list and a bounded pool of concurrent reservation holders.
+- Requests `POST /events/{id}/queue` enqueue the user; as slots open, the grain promotes the next waiter, publishes a `ReservationReadyMessage` to the `reservations-ready` Service Bus queue and mirrors the state into Redis (`queue:{queueId}`).
+- An in-silo SignalR hub (`/hubs/queue`) subscribes each connected user to a per-user group. The `ReservationReadyConsumer` background service receives SB messages and pushes `ReservationReady` to the correct group, so the client's WebSocket promotes instantly instead of waiting for the next `/myqueue` poll.
+- Reservations expire after **3 minutes** via an Orleans reminder on the queue grain; the slot returns to the pool and the next waiter is promoted.
+- `GET /myqueue/{queueId}` reads from the Redis mirror, so queue-position polling is cheap under load.
+
+#### Caching
+
+`GET /events/{id}` — the hot read path — is fronted by a Redis cache with a 60-second TTL, populated by the grain on miss and invalidated by `POST /events`.
+
 ---
 
 ### Infrastructure
@@ -73,6 +87,14 @@ The account is accessible only via a private endpoint in the shared PE subnet; p
 ##### Secrets — Key Vault
 
 A Standard-tier Key Vault is deployed with RBAC authorisation, soft delete (90-day retention) and no public network access via a private endpoint in the shared PE subnet. No connection strings are stored in application configuration — Cosmos access uses AAD tokens via workload identity.
+
+##### Cache — Azure Cache for Redis
+
+A Standard-tier Redis instance with `disableAccessKeyAuthentication: true` (AAD-only), `publicNetworkAccess: Disabled` and TLS 1.2 minimum. The Silo's managed identity is granted the built-in `Data Contributor` access policy; traffic is routed via a private endpoint in the shared PE subnet with the `privatelink.redis.cache.windows.net` DNS zone linked to the VNet. Used for the `GET /events/{id}` read cache and the queue-position mirror.
+
+##### Messaging — Azure Service Bus
+
+A Premium-tier Service Bus namespace (Premium is required for VNet Private Link) with `disableLocalAuth: true`, public access disabled and TLS 1.2 minimum. A single `reservations-ready` queue with dead-lettering on expiry carries reservation-ready events produced by `ReservationQueueGrain` and consumed by the in-silo `ReservationReadyConsumer`, which fans them out over SignalR. The Silo identity is granted the `Azure Service Bus Data Owner` role at namespace scope; traffic flows via a private endpoint with `privatelink.servicebus.windows.net`.
 
 ##### Edge — Azure Front Door
 

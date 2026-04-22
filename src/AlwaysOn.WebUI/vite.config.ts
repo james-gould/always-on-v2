@@ -23,6 +23,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      '/hubs': {
+        target: process.env.services__silo__https__0 || process.env.services__silo__http__0 || 'http://localhost:5220',
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 })
