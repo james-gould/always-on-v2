@@ -18,7 +18,7 @@ param subscriptionName string = 'reservations-ready'
 
 var namespaceName = '${resourcePrefix}-eventgrid'
 
-resource eventGridNamespace 'Microsoft.EventGrid/namespaces@2024-06-01-preview' = {
+resource eventGridNamespace 'Microsoft.EventGrid/namespaces@2025-02-15' = {
   name: namespaceName
   location: location
   tags: tags
@@ -28,11 +28,11 @@ resource eventGridNamespace 'Microsoft.EventGrid/namespaces@2024-06-01-preview' 
   }
   properties: {
     publicNetworkAccess: 'Disabled'
-    isZoneRedundant: false
+    isZoneRedundant: true
   }
 }
 
-resource topic 'Microsoft.EventGrid/namespaces/topics@2024-06-01-preview' = {
+resource topic 'Microsoft.EventGrid/namespaces/topics@2025-02-15' = {
   parent: eventGridNamespace
   name: topicName
   properties: {
@@ -42,7 +42,7 @@ resource topic 'Microsoft.EventGrid/namespaces/topics@2024-06-01-preview' = {
   }
 }
 
-resource subscription 'Microsoft.EventGrid/namespaces/topics/eventSubscriptions@2024-06-01-preview' = {
+resource subscription 'Microsoft.EventGrid/namespaces/topics/eventSubscriptions@2025-02-15' = {
   parent: topic
   name: subscriptionName
   properties: {
