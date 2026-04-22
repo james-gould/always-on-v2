@@ -27,13 +27,19 @@ internal static class QueueServiceCollectionExtensions
             configOptions.AbortOnConnectFail = false;
             configOptions.Ssl = true;
 
-            builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
-            {
-                configOptions.ConfigureForAzureWithTokenCredentialAsync(new DefaultAzureCredential())
-                    .GetAwaiter().GetResult();
+            // Acquire the AAD token and connect eagerly at startup rather than
+            // inside a lazy DI factory. Doing this inside the factory meant any
+            // token-acquisition failure (or transient credential hiccup)
+            // re-threw during singleton resolution of IEventReadCache and
+            // IQueueIndex on the first request, surfacing as an HTTP 500 on
+            // every endpoint. Failing fast here surfaces misconfiguration to
+            // the platform (pod restart) and keeps the request path
+            // exception-free on Redis setup.
+            configOptions.ConfigureForAzureWithTokenCredentialAsync(new DefaultAzureCredential())
+                .ConfigureAwait(false).GetAwaiter().GetResult();
+            var multiplexer = ConnectionMultiplexer.Connect(configOptions);
 
-                return ConnectionMultiplexer.Connect(configOptions);
-            });
+            builder.Services.AddSingleton<IConnectionMultiplexer>(multiplexer);
 
             builder.Services.AddOptions<EventReadCacheOptions>()
                 .Bind(builder.Configuration.GetSection("EventReadCache"));
