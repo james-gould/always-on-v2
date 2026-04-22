@@ -49,7 +49,7 @@ resource subscription 'Microsoft.EventGrid/namespaces/topics/eventSubscriptions@
     deliveryConfiguration: {
       deliveryMode: 'Queue'
       queue: {
-        receiveLockDurationInSeconds: 30
+        receiveLockDurationInSeconds: 60
         maxDeliveryCount: 10
         eventTimeToLive: 'PT10M'
       }
