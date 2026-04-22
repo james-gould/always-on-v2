@@ -259,7 +259,7 @@ foreach ($doc in $documents) {
         # Add readiness and liveness probes to the first container
         $trimmed = $trimmed -replace `
             '(ports:\s*\n(\s*- containerPort: \d+\n)+)', `
-            ("`$1" + '          readinessProbe:' + "`n" + '            httpGet:' + "`n" + '              path: /health' + "`n" + '              port: 8080' + "`n" + '            initialDelaySeconds: 15' + "`n" + '            periodSeconds: 10' + "`n" + '          livenessProbe:' + "`n" + '            httpGet:' + "`n" + '              path: /alive' + "`n" + '              port: 8080' + "`n" + '            initialDelaySeconds: 15' + "`n" + '            periodSeconds: 30' + "`n")
+            ("`$1" + '          readinessProbe:' + "`n" + '            httpGet:' + "`n" + '              path: /alive' + "`n" + '              port: 8080' + "`n" + '            initialDelaySeconds: 15' + "`n" + '            periodSeconds: 10' + "`n" + '          livenessProbe:' + "`n" + '            httpGet:' + "`n" + '              path: /alive' + "`n" + '              port: 8080' + "`n" + '            initialDelaySeconds: 15' + "`n" + '            periodSeconds: 30' + "`n")
     }
 
     Set-Content (Join-Path $outputDir "manifest-$docIndex.yaml") -Value $trimmed -Encoding utf8

@@ -20,7 +20,6 @@ var silo = builder.AddProject<Projects.AlwaysOn_Silo>(AspireConstants.Silo)
        .WithReference(db)
        .WithReference(cache)
        .WithReference(eventGrid)
-       .WaitFor(cache)
        .WithComputeEnvironment(k8s);
 
 if (isTestMode)
