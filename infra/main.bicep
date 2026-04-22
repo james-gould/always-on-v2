@@ -33,20 +33,11 @@ param cosmosMaxThroughput int = 1000
 @description('Object ID of the Azure AD group or user that should have Key Vault admin access.')
 param keyVaultAdminObjectId string
 
-@description('Hostname of the AKS internal ingress (set after K8s ingress is deployed).')
-param originHostName string
-
-@description('Resource ID of the AKS internal load balancer frontend IP configuration. Leave empty on first deploy (before k8s services exist).')
-param internalLoadBalancerFrontendIpId string = ''
-
 var resourcePrefix = '${baseName}-${environment}'
 var tags = {
   project: 'always-on'
   environment: environment
 }
-
-// Well-known Azure role definition IDs
-var networkContributorRoleId = '4d97b98b-1d4f-4787-a291-c67834d212e7'
 
 module network 'modules/network.bicep' = {
   name: 'network'
@@ -124,27 +115,22 @@ module acr 'modules/acr.bicep' = {
   }
 }
 
-var privateLinkServiceId = pls.?outputs.?privateLinkServiceId ?? ''
+module ingressPip 'modules/pip.bicep' = {
+  name: 'ingress-pip'
+  params: {
+    location: location
+    resourcePrefix: resourcePrefix
+    tags: tags
+    aksClusterIdentityPrincipalId: aks.outputs.clusterIdentityPrincipalId
+  }
+}
 
 module frontDoor 'modules/frontdoor.bicep' = {
   name: 'frontdoor'
   params: {
     resourcePrefix: resourcePrefix
     tags: tags
-    originHostName: originHostName
-    privateLinkServiceId: privateLinkServiceId
-    privateLinkLocation: !empty(privateLinkServiceId) ? location : ''
-  }
-}
-
-module pls 'modules/pls.bicep' = if (!empty(internalLoadBalancerFrontendIpId)) {
-  name: 'pls'
-  params: {
-    location: location
-    resourcePrefix: resourcePrefix
-    tags: tags
-    plsSubnetId: network.outputs.plsSubnetId
-    loadBalancerFrontendIpConfigId: internalLoadBalancerFrontendIpId
+    originHostName: ingressPip.outputs.pipAddress
   }
 }
 
@@ -161,21 +147,6 @@ module identity 'modules/identity.bicep' = {
   }
 }
 
-// AKS cluster identity needs Network Contributor on the aks-system subnet to create internal load balancers
-resource aksSystemSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
-  name: '${resourcePrefix}-vnet/aks-system'
-}
-
-resource aksSubnetRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroup().id, 'aks-system-network-contributor')
-  scope: aksSystemSubnet
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', networkContributorRoleId)
-    principalId: aks.outputs.clusterIdentityPrincipalId
-    principalType: 'ServicePrincipal'
-  }
-}
-
 output aksClusterName string = aks.outputs.clusterName
 output cosmosAccountName string = cosmosDb.outputs.accountName
 output cosmosAccountEndpoint string = cosmosDb.outputs.accountEndpoint
@@ -185,3 +156,6 @@ output acrLoginServer string = acr.outputs.loginServer
 output siloIdentityClientId string = identity.outputs.identityClientId
 output redisHostName string = redis.outputs.hostName
 output eventGridEndpoint string = eventGrid.outputs.endpoint
+output ingressPipName string = ingressPip.outputs.pipName
+output ingressPipAddress string = ingressPip.outputs.pipAddress
+output ingressPipResourceGroup string = ingressPip.outputs.pipResourceGroup

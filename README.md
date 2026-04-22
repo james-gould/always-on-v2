@@ -64,7 +64,9 @@ All infrastructure is defined in Bicep, modularised under `infra/` with a single
 
 ##### Networking
 
-A `/14` VNet is partitioned into dedicated subnets: one per AKS node pool (system, gateway, silo), a shared private endpoint subnet for all PaaS services (Cosmos DB, Key Vault), and a Private Link Service subnet for Front Door ingress. Private DNS zones for `privatelink.documents.azure.com` and `privatelink.vaultcore.azure.net` are linked to the VNet, ensuring all PaaS traffic resolves over the private backbone. No public endpoints are exposed on any backing service.
+A `/14` VNet is partitioned into dedicated subnets: one per AKS node pool (system, gateway, silo) and a shared private endpoint subnet for all PaaS services (Cosmos DB, Key Vault, Redis, Event Grid). Private DNS zones for `privatelink.documents.azure.com`, `privatelink.vaultcore.azure.net`, `privatelink.redis.cache.windows.net` and `privatelink.eventgrid.azure.net` are linked to the VNet, ensuring all PaaS traffic resolves over the private backbone. No public endpoints are exposed on any backing service.
+
+The Silo is reached via a public Azure Load Balancer (the k8s `silo-service`), but a network security group on the `aks-system` subnet restricts inbound traffic to the `AzureFrontDoor.Backend` service tag (plus the `AzureLoadBalancer` tag for health probes and intra-VNet traffic). All other internet-sourced traffic is denied at the subnet boundary, so Azure Front Door is the only external path that can reach the cluster.
 
 ##### Compute — AKS
 
@@ -98,7 +100,7 @@ A Standard-tier Event Grid Namespace with public access disabled and TLS 1.2 min
 
 ##### Edge — Azure Front Door
 
-Azure Front Door Premium acts as the global entry point, terminating TLS and routing traffic to the AKS internal load balancer via Private Link Service. A WAF policy runs in Prevention mode with Microsoft Default Rule Set 2.1 and Bot Manager Rule Set 1.1. A custom rate-limit rule caps requests at 1,000 per minute per client IP. Front Door is the only publicly exposed resource — all backend traffic flows over the Azure private backbone.
+Azure Front Door Premium acts as the global entry point, terminating TLS and routing traffic to the AKS public load balancer. Direct-to-origin access is blocked at the NSG layer (see Networking above), so AFD is the only external path into the cluster. A WAF policy runs in Prevention mode with Microsoft Default Rule Set 2.1 and Bot Manager Rule Set 1.1. A custom rate-limit rule caps requests at 1,000 per minute per client IP.
 
 ---
 

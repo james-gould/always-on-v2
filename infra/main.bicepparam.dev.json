@@ -11,9 +11,6 @@
     "keyVaultAdminObjectId": {
       "value": "bec79daa-7e4a-4555-acfb-59f019c529f2"
     },
-    "originHostName": {
-      "value": "4.175.16.215"
-    },
     "cosmosLocation": {
       "value": "northeurope"
     }

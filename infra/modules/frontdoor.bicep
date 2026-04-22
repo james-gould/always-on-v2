@@ -4,20 +4,13 @@ param resourcePrefix string
 @description('Resource tags.')
 param tags object
 
-@description('Hostname of the AKS internal ingress (set after K8s ingress deployment).')
+@description('Hostname (or public IP) of the AKS ingress load balancer.')
 param originHostName string
-
-@description('Resource ID of the Private Link Service fronting the AKS internal load balancer.')
-param privateLinkServiceId string = ''
-
-@description('Azure region of the Private Link Service (required when privateLinkServiceId is set).')
-param privateLinkLocation string = ''
 
 @description('HTTP port of the origin.')
 param originHttpPort int = 8080
 
 var profileName = '${resourcePrefix}-afd'
-var hasPrivateLink = !empty(privateLinkServiceId)
 
 resource frontDoorProfile 'Microsoft.Cdn/profiles@2024-09-01' = {
   name: profileName
@@ -145,15 +138,6 @@ resource origin 'Microsoft.Cdn/profiles/originGroups/origins@2024-09-01' = {
     weight: 1000
     enabledState: 'Enabled'
     enforceCertificateNameCheck: false
-    sharedPrivateLinkResource: hasPrivateLink
-      ? {
-          privateLink: {
-            id: privateLinkServiceId
-          }
-          privateLinkLocation: privateLinkLocation
-          requestMessage: 'Front Door Private Link to AKS'
-        }
-      : null
   }
 }
 
@@ -180,3 +164,4 @@ resource route 'Microsoft.Cdn/profiles/afdEndpoints/routes@2024-09-01' = {
 
 output profileName string = frontDoorProfile.name
 output endpoint string = endpoint.properties.hostName
+output frontDoorId string = frontDoorProfile.properties.frontDoorId

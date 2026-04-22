@@ -9,6 +9,73 @@ param tags object
 
 var vnetName = '${resourcePrefix}-vnet'
 
+resource aksSystemNsg 'Microsoft.Network/networkSecurityGroups@2024-05-01' = {
+  name: '${resourcePrefix}-aks-system-nsg'
+  location: location
+  tags: tags
+  properties: {
+    securityRules: [
+      {
+        // Allow Azure Front Door backend traffic to the public LoadBalancer IP.
+        // AFD is the only sanctioned ingress path; all other internet traffic is denied below.
+        name: 'AllowFrontDoorInbound'
+        properties: {
+          priority: 100
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourceAddressPrefix: 'AzureFrontDoor.Backend'
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRanges: ['80', '443', '8080']
+        }
+      }
+      {
+        // Allow Azure LB health probes (required for public LoadBalancer services).
+        name: 'AllowAzureLoadBalancerInbound'
+        properties: {
+          priority: 110
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: '*'
+          sourceAddressPrefix: 'AzureLoadBalancer'
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '*'
+        }
+      }
+      {
+        // Intra-VNet traffic (pod-to-pod, node-to-node, PE access).
+        name: 'AllowVnetInbound'
+        properties: {
+          priority: 120
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: '*'
+          sourceAddressPrefix: 'VirtualNetwork'
+          sourcePortRange: '*'
+          destinationAddressPrefix: 'VirtualNetwork'
+          destinationPortRange: '*'
+        }
+      }
+      {
+        // Deny everything else from the internet — no direct-to-IP bypass of AFD.
+        name: 'DenyInternetInbound'
+        properties: {
+          priority: 4000
+          direction: 'Inbound'
+          access: 'Deny'
+          protocol: '*'
+          sourceAddressPrefix: 'Internet'
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '*'
+        }
+      }
+    ]
+  }
+}
+
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
   name: vnetName
   location: location
@@ -24,6 +91,9 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
         name: 'aks-system'
         properties: {
           addressPrefix: '10.0.0.0/16'
+          networkSecurityGroup: {
+            id: aksSystemNsg.id
+          }
         }
       }
       {
@@ -43,14 +113,6 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
         name: 'private-endpoints'
         properties: {
           addressPrefix: '10.3.0.0/24'
-        }
-      }
-      {
-        // Subnet for Private Link Service (Front Door → AKS internal LB)
-        name: 'private-link-service'
-        properties: {
-          addressPrefix: '10.3.1.0/24'
-          privateLinkServiceNetworkPolicies: 'Disabled'
         }
       }
     ]
@@ -134,4 +196,3 @@ output aksSystemSubnetId string = '${vnet.id}/subnets/aks-system'
 output aksGatewaySubnetId string = '${vnet.id}/subnets/aks-gateway'
 output aksSiloSubnetId string = '${vnet.id}/subnets/aks-silo'
 output privateEndpointSubnetId string = '${vnet.id}/subnets/private-endpoints'
-output plsSubnetId string = '${vnet.id}/subnets/private-link-service'

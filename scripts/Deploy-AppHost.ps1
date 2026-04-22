@@ -174,10 +174,32 @@ if (-not $eventGridEndpoint) {
     Write-Error "Failed to get Event Grid endpoint from deployment outputs."
 }
 
+$ingressPipName = az deployment group show `
+    --resource-group $resourceGroup `
+    --name main `
+    --query "properties.outputs.ingressPipName.value" -o tsv
+if (-not $ingressPipName) {
+    Write-Error "Failed to get ingress public IP name from deployment outputs."
+}
+
+$ingressPipResourceGroup = az deployment group show `
+    --resource-group $resourceGroup `
+    --name main `
+    --query "properties.outputs.ingressPipResourceGroup.value" -o tsv
+if (-not $ingressPipResourceGroup) {
+    Write-Error "Failed to get ingress public IP resource group from deployment outputs."
+}
+
+$ingressPipAddress = az deployment group show `
+    --resource-group $resourceGroup `
+    --name main `
+    --query "properties.outputs.ingressPipAddress.value" -o tsv
+
 Write-Host "  Identity client ID: $siloIdentityClientId"
 Write-Host "  Cosmos endpoint   : $cosmosEndpoint"
 Write-Host "  Redis host        : $redisHostName"
 Write-Host "  Event Grid        : $eventGridEndpoint"
+Write-Host "  Ingress PIP       : $ingressPipName ($ingressPipAddress)"
 
 # Create the K8s service account with workload identity annotation
 $saYaml = @"
@@ -240,10 +262,19 @@ foreach ($doc in $documents) {
         $trimmed = $trimmed -replace '(ConnectionStrings__cache:.*)', "`$1`n  ConnectionStrings__eventgrid: `"$eventGridEndpoint`""
     }
 
-    # Patch silo-service: ClusterIP → external LoadBalancer
-    # AFD reaches the origin directly via public IP (no Private Link Service configured).
+    # Patch silo-service: ClusterIP → public LoadBalancer bound to the pre-allocated PIP.
+    # AFD reaches the origin via this fixed IP; the aks-system NSG blocks non-AFD traffic.
     if ($trimmed -match 'name:\s*"silo-service"' -and $trimmed -match 'type:\s*"ClusterIP"') {
         $trimmed = $trimmed -replace 'type:\s*"ClusterIP"', 'type: "LoadBalancer"'
+        $annotations = @(
+            '  annotations:'
+            "    service.beta.kubernetes.io/azure-pip-name: `"$ingressPipName`""
+            "    service.beta.kubernetes.io/azure-load-balancer-resource-group: `"$ingressPipResourceGroup`""
+        ) -join "`n"
+        # Inject annotations under metadata: of the silo-service document (idempotent — skip if already present).
+        if ($trimmed -notmatch 'azure-pip-name') {
+            $trimmed = $trimmed -replace '(metadata:\s*\n\s*name:\s*"silo-service"[^\n]*\n)', "`$1$annotations`n"
+        }
     }
 
     # Patch silo-deployment: add serviceAccountName, workload identity label, and probes
@@ -282,7 +313,9 @@ Write-Host "  Image : $fullImage"
 Write-Host "  Chart : $baseDir"
 if ($externalIp) {
     Write-Host "  Silo LB IP: $externalIp" -ForegroundColor Yellow
-    Write-Host "  If this IP differs from the AFD origin, update 'originHostName' in main.bicepparam.dev.json and redeploy infra." -ForegroundColor Yellow
+    if ($ingressPipAddress -and $externalIp -ne $ingressPipAddress) {
+        Write-Host "  WARNING: LB IP does not match the pre-allocated ingress PIP ($ingressPipAddress). Check service annotations." -ForegroundColor Red
+    }
 } else {
     Write-Host "  WARNING: Could not determine silo-service external IP. Check 'kubectl get svc silo-service'." -ForegroundColor Red
 }
