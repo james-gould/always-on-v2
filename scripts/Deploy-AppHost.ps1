@@ -158,8 +158,26 @@ if (-not $cosmosEndpoint) {
     Write-Error "Failed to get Cosmos account endpoint from deployment outputs."
 }
 
+$redisHostName = az deployment group show `
+    --resource-group $resourceGroup `
+    --name main `
+    --query "properties.outputs.redisHostName.value" -o tsv
+if (-not $redisHostName) {
+    Write-Error "Failed to get Redis host name from deployment outputs."
+}
+
+$eventGridEndpoint = az deployment group show `
+    --resource-group $resourceGroup `
+    --name main `
+    --query "properties.outputs.eventGridEndpoint.value" -o tsv
+if (-not $eventGridEndpoint) {
+    Write-Error "Failed to get Event Grid endpoint from deployment outputs."
+}
+
 Write-Host "  Identity client ID: $siloIdentityClientId"
 Write-Host "  Cosmos endpoint   : $cosmosEndpoint"
+Write-Host "  Redis host        : $redisHostName"
+Write-Host "  Event Grid        : $eventGridEndpoint"
 
 # Create the K8s service account with workload identity annotation
 $saYaml = @"
@@ -183,9 +201,11 @@ if (-not (Get-Command helm -ErrorAction SilentlyContinue)) {
     Write-Error 'helm is not installed or not on PATH.'
 }
 
-# Render the chart with dynamic values injected
+# Render the chart with dynamic values injected.
+# cache_password is set to empty because Azure Redis uses AAD-only auth (no access keys).
 $rendered = helm template alwayson $baseDir `
-    --set "parameters.silo.silo_image=$fullImage" 2>&1
+    --set "parameters.silo.silo_image=$fullImage" `
+    --set "secrets.silo.cache_password=" 2>&1
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Helm template failed: $rendered"
@@ -206,13 +226,18 @@ foreach ($doc in $documents) {
     if (-not $trimmed) { continue }
     $docIndex++
 
-    # Patch silo-config: add Cosmos endpoint and remove stale connection strings
+    # Patch silo-config: add Cosmos endpoint, Redis, Event Grid, and remove stale connection strings
     if ($trimmed -match 'kind:\s*"ConfigMap"' -and $trimmed -match 'name:\s*"silo-config"') {
         # Remove the placeholder connection string and URI
         $trimmed = $trimmed -replace '(?m)^\s*ConnectionStrings__alwayson:.*$\n', ''
         $trimmed = $trimmed -replace '(?m)^\s*ALWAYSON_URI:.*$\n', ''
         # Add the Cosmos account endpoint for AAD auth
         $trimmed = $trimmed -replace '(ALWAYSON_DATABASENAME:.*)', "`$1`n  Orleans__Cosmos__AccountEndpoint: `"$cosmosEndpoint`""
+        # Redis connection string for AAD-only auth (no password, SSL on port 6380)
+        $trimmed = $trimmed -replace '(?m)^\s*ConnectionStrings__cache:.*$\n', ''
+        $trimmed = $trimmed -replace '(Orleans__Cosmos__AccountEndpoint:.*)', "`$1`n  ConnectionStrings__cache: `"$($redisHostName):6380,ssl=True,abortConnect=False`""
+        # Event Grid endpoint for pull-delivery messaging
+        $trimmed = $trimmed -replace '(ConnectionStrings__cache:.*)', "`$1`n  ConnectionStrings__eventgrid: `"$eventGridEndpoint`""
     }
 
     # Patch silo-service: ClusterIP → internal LoadBalancer
