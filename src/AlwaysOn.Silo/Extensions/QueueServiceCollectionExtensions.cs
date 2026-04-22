@@ -5,6 +5,7 @@ using AlwaysOn.Silo.Hubs;
 using AlwaysOn.Silo.Queueing;
 using Azure.Identity;
 using Azure.Messaging.EventGrid.Namespaces;
+using StackExchange.Redis;
 
 namespace AlwaysOn.Silo.Extensions;
 
@@ -23,12 +24,26 @@ internal static class QueueServiceCollectionExtensions
     /// </summary>
     public static IHostApplicationBuilder AddEventReadCache(this IHostApplicationBuilder builder)
     {
-        var hasRedis = !string.IsNullOrWhiteSpace(
-            builder.Configuration.GetConnectionString(AspireConstants.RedisCache));
+        var redisConnectionString = builder.Configuration.GetConnectionString(AspireConstants.RedisCache);
+        var hasRedis = !string.IsNullOrWhiteSpace(redisConnectionString);
 
         if (hasRedis)
         {
-            builder.AddRedisClient(AspireConstants.RedisCache);
+            // Azure Cache for Redis is AAD-only (disableAccessKeyAuthentication: true in infra).
+            // StackExchange.Redis needs ConfigureForAzureWithTokenCredentialAsync to attach a
+            // token provider; a bare Connect() would fail auth and stall every request until
+            // syncTimeout (~5s), which previously caused 10s+ response times on /events/{id}.
+            var configOptions = ConfigurationOptions.Parse(redisConnectionString!);
+            configOptions.AbortOnConnectFail = false;
+            configOptions.Ssl = true;
+
+            builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+            {
+                configOptions.ConfigureForAzureWithTokenCredentialAsync(new DefaultAzureCredential())
+                    .GetAwaiter().GetResult();
+                return ConnectionMultiplexer.Connect(configOptions);
+            });
+
             builder.Services.AddOptions<EventReadCacheOptions>()
                 .Bind(builder.Configuration.GetSection("EventReadCache"));
             builder.Services.AddSingleton<IEventReadCache, RedisEventReadCache>();
