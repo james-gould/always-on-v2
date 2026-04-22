@@ -14,7 +14,9 @@ param privateEndpointSubnetId string
 param reservationsQueueName string = 'reservations-ready'
 
 // Premium SKU is required for VNet integration / Private Link support.
-var namespaceName = '${resourcePrefix}-sb'
+// Note: the '-sb' suffix is reserved by Azure Service Bus and cannot be used
+// for namespace names, so we use '-servicebus' instead.
+var namespaceName = '${resourcePrefix}-servicebus'
 
 resource serviceBus 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
   name: namespaceName
@@ -48,7 +50,7 @@ resource reservationsQueue 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' =
 }
 
 resource privateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: '${resourcePrefix}-sb-pe'
+  name: '${resourcePrefix}-servicebus-pe'
   location: location
   tags: tags
   properties: {
@@ -57,7 +59,7 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
     }
     privateLinkServiceConnections: [
       {
-        name: '${resourcePrefix}-sb-plsc'
+        name: '${resourcePrefix}-servicebus-plsc'
         properties: {
           privateLinkServiceId: serviceBus.id
           groupIds: ['namespace']
@@ -73,7 +75,7 @@ resource dnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' existing = {
 
 resource dnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
   parent: privateEndpoint
-  name: 'sb-dns-group'
+  name: 'servicebus-dns-group'
   properties: {
     privateDnsZoneConfigs: [
       {
