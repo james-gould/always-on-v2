@@ -16,12 +16,6 @@ namespace AlwaysOn.Silo.Extensions;
 /// </summary>
 internal static class QueueServiceCollectionExtensions
 {
-    /// <summary>
-    /// Registers the Redis-backed event read cache and queue index when a Redis
-    /// connection string is configured. Falls back to in-process implementations
-    /// (used by the in-memory integration-test mode) so endpoint contracts
-    /// remain unchanged.
-    /// </summary>
     public static IHostApplicationBuilder AddEventReadCache(this IHostApplicationBuilder builder)
     {
         var redisConnectionString = builder.Configuration.GetConnectionString(AspireConstants.RedisCache);
@@ -29,10 +23,6 @@ internal static class QueueServiceCollectionExtensions
 
         if (hasRedis)
         {
-            // Azure Cache for Redis is AAD-only (disableAccessKeyAuthentication: true in infra).
-            // StackExchange.Redis needs ConfigureForAzureWithTokenCredentialAsync to attach a
-            // token provider; a bare Connect() would fail auth and stall every request until
-            // syncTimeout (~5s), which previously caused 10s+ response times on /events/{id}.
             var configOptions = ConfigurationOptions.Parse(redisConnectionString!);
             configOptions.AbortOnConnectFail = false;
             configOptions.Ssl = true;
@@ -41,6 +31,7 @@ internal static class QueueServiceCollectionExtensions
             {
                 configOptions.ConfigureForAzureWithTokenCredentialAsync(new DefaultAzureCredential())
                     .GetAwaiter().GetResult();
+
                 return ConnectionMultiplexer.Connect(configOptions);
             });
 
@@ -58,10 +49,6 @@ internal static class QueueServiceCollectionExtensions
         return builder;
     }
 
-    /// <summary>
-    /// Registers the Event Grid notifier + background consumer when an Event
-    /// Grid connection string is configured, or a no-op notifier otherwise.
-    /// </summary>
     public static IHostApplicationBuilder AddReservationMessaging(this IHostApplicationBuilder builder)
     {
         var eventGridEndpoint = builder.Configuration.GetConnectionString(AspireConstants.EventGrid);
@@ -88,28 +75,21 @@ internal static class QueueServiceCollectionExtensions
         return builder;
     }
 
-    /// <summary>
-    /// Registers queue-grain options, the shared <see cref="TimeProvider"/> and
-    /// the self-hosted SignalR hub used to push reservation-ready events.
-    /// </summary>
     public static IHostApplicationBuilder AddReservationQueueCore(this IHostApplicationBuilder builder)
     {
         builder.Services.AddOptions<ReservationQueueOptions>()
             .Bind(builder.Configuration.GetSection("ReservationQueue"));
         builder.Services.AddSingleton(TimeProvider.System);
 
-        // Self-hosted SignalR (ASP.NET Core, no separate Azure SignalR Service
-        // or emulator) keeps the dev-ex simple and puts the hub next to its
-        // only consumer, ReservationReadyConsumer.
         builder.Services.AddSignalR();
 
         return builder;
     }
 
-    /// <summary>Maps the queue-ready SignalR hub route.</summary>
     public static WebApplication MapQueueHub(this WebApplication app)
     {
         app.MapHub<QueueHub>("/hubs/queue");
+
         return app;
     }
 }
