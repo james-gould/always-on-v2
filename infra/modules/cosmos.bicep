@@ -21,7 +21,7 @@ param maxThroughput int = 1000
 
 var accountName = replace('${resourcePrefix}-cosmos', '-', '')
 
-resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
+resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2025-04-15' = {
   name: accountName
   location: location
   tags: tags
@@ -44,7 +44,7 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview
   }
 }
 
-resource orleansDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-12-01-preview' = {
+resource orleansDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2025-04-15' = {
   parent: cosmosAccount
   name: databaseName
   properties: {
@@ -59,7 +59,7 @@ resource orleansDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@202
   }
 }
 
-resource clusteringContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-12-01-preview' = {
+resource clusteringContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-04-15' = {
   parent: orleansDatabase
   name: 'orleans-clustering'
   properties: {
@@ -74,7 +74,7 @@ resource clusteringContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases
   }
 }
 
-resource grainStateContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-12-01-preview' = {
+resource grainStateContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-04-15' = {
   parent: orleansDatabase
   name: 'orleans-grain-state'
   properties: {
@@ -89,7 +89,7 @@ resource grainStateContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases
   }
 }
 
-resource remindersContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-12-01-preview' = {
+resource remindersContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-04-15' = {
   parent: orleansDatabase
   name: 'orleans-reminders'
   properties: {

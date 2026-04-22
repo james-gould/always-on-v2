@@ -16,7 +16,7 @@ param adminObjectId string
 var vaultName = replace('${resourcePrefix}-kv', '-', '')
 var keyVaultAdministratorRoleId = '00482a5a-887f-4fb3-b363-3b7fe8e74483'
 
-resource keyVault 'Microsoft.KeyVault/vaults@2024-04-01-preview' = {
+resource keyVault 'Microsoft.KeyVault/vaults@2025-05-01' = {
   name: vaultName
   location: location
   tags: tags

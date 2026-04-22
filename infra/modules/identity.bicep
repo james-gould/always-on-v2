@@ -82,7 +82,7 @@ resource redisAccessPolicy 'Microsoft.Cache/redis/accessPolicyAssignments@2024-1
 var eventGridDataSenderRoleId = 'd5a91429-5739-47e2-a06b-3470a27159e7'
 var eventGridDataReceiverRoleId = '78cbd9e7-9798-4e2e-9b5a-547d9ebb31fb'
 
-resource eventGridNamespace 'Microsoft.EventGrid/namespaces@2024-06-01-preview' existing = {
+resource eventGridNamespace 'Microsoft.EventGrid/namespaces@2025-02-15' existing = {
   name: eventGridNamespaceName
 }
 
