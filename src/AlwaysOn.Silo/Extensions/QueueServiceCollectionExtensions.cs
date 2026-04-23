@@ -30,11 +30,10 @@ internal static class QueueServiceCollectionExtensions
                 var configOptions = ConfigurationOptions.Parse(redisConnectionString!);
                 configOptions.Ssl = true;
                 configOptions.AbortOnConnectFail = false;
-                // RESP3 keeps the interactive + subscription traffic on one
-                // connection that gets proactively re-authenticated with fresh
-                // AAD tokens (RESP2 drops the subscription connection every
-                // hour, which surfaces as "MicrosoftEntraTokenExpired" errors).
-                configOptions.Protocol = RedisProtocol.Resp3;
+                // Stay on RESP2. Azure Cache for Redis Basic/Standard runs
+                // Redis 6.x, which does not fully support RESP3 — negotiating
+                // HELLO 3 introduces failed handshakes and extra round-trips
+                // per command. RESP3 would only help on the Enterprise tier.
                 // Fail fast if Redis is unreachable rather than letting the
                 // default 5s syncTimeout stack up on every cache read+write.
                 configOptions.ConnectTimeout = 2000;
