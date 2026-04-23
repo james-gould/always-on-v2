@@ -134,6 +134,18 @@ resource prometheusDcra 'Microsoft.Insights/dataCollectionRuleAssociations@2023-
   ]
 }
 
+resource containerInsightsDcra 'Microsoft.Insights/dataCollectionRuleAssociations@2023-03-11' = {
+  name: '${resourcePrefix}-ci-dcra'
+  scope: aksCluster
+  properties: {
+    dataCollectionRuleId: observability.outputs.containerInsightsDcrId
+    description: 'Container Insights logs from AKS to Log Analytics workspace.'
+  }
+  dependsOn: [
+    aks
+  ]
+}
+
 module acr 'modules/acr.bicep' = {
   name: 'acr'
   params: {

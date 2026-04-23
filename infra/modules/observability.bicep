@@ -90,8 +90,45 @@ resource prometheusDcr 'Microsoft.Insights/dataCollectionRules@2023-03-11' = {
   }
 }
 
+// ───────────────────────────────────────────────────────────
+// Data Collection Rule for Container Insights → LAW
+// ───────────────────────────────────────────────────────────
+resource containerInsightsDcr 'Microsoft.Insights/dataCollectionRules@2023-03-11' = {
+  name: '${resourcePrefix}-ci-dcr'
+  location: location
+  tags: tags
+  properties: {
+    dataCollectionEndpointId: dataCollectionEndpoint.id
+    dataSources: {
+      extensions: [
+        {
+          name: 'ContainerInsightsExtension'
+          extensionName: 'ContainerInsights'
+          streams: ['Microsoft-ContainerInsights-Group-Default']
+        }
+      ]
+    }
+    destinations: {
+      logAnalytics: [
+        {
+          workspaceResourceId: logAnalytics.id
+          name: 'ciworkspace'
+        }
+      ]
+    }
+    dataFlows: [
+      {
+        streams: ['Microsoft-ContainerInsights-Group-Default']
+        destinations: ['ciworkspace']
+      }
+    ]
+    description: 'Container Insights DCR for AKS'
+  }
+}
+
 output logAnalyticsWorkspaceId string = logAnalytics.id
 output logAnalyticsWorkspaceName string = logAnalytics.name
 output azureMonitorWorkspaceId string = azureMonitorWorkspace.id
 output azureMonitorWorkspaceName string = azureMonitorWorkspace.name
 output prometheusDcrId string = prometheusDcr.id
+output containerInsightsDcrId string = containerInsightsDcr.id

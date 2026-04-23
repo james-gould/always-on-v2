@@ -248,6 +248,17 @@ foreach ($doc in $documents) {
     if (-not $trimmed) { continue }
     $docIndex++
 
+    # Patch silo-secrets: override Aspire-generated connection strings with Azure service endpoints.
+    # Secrets load after the ConfigMap via envFrom, so they win — we must patch them too.
+    if ($trimmed -match 'kind:\s*"Secret"' -and $trimmed -match 'name:\s*"silo-secrets"') {
+        $redisConnB64 = [System.Convert]::ToBase64String(
+            [System.Text.Encoding]::UTF8.GetBytes("$($redisHostName):6380,ssl=True,abortConnect=False"))
+        $eventGridB64 = [System.Convert]::ToBase64String(
+            [System.Text.Encoding]::UTF8.GetBytes($eventGridEndpoint))
+        $trimmed = $trimmed -replace '(?m)^\s*ConnectionStrings__cache:.*$', "  ConnectionStrings__cache: `"$redisConnB64`""
+        $trimmed = $trimmed -replace '(?m)^\s*ConnectionStrings__eventgrid:.*$', "  ConnectionStrings__eventgrid: `"$eventGridB64`""
+    }
+
     # Patch silo-config: add Cosmos endpoint, Redis, Event Grid, and remove stale connection strings
     if ($trimmed -match 'kind:\s*"ConfigMap"' -and $trimmed -match 'name:\s*"silo-config"') {
         # Remove the placeholder connection string and URI
