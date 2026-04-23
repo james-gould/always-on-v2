@@ -158,18 +158,18 @@ Details (average, fastest, slowest):
 
 </details>
 
-#### After Redis AAD Fix + Private Endpoint
+#### After Redis AAD Fix + Async Init
 
 | Metric | Value |
 |---|---|
-| **Requests/sec** | **2,813** |
-| **Total time** | 3.56s |
-| **Avg latency** | 84ms |
-| **P50 latency** | 64ms |
-| **P90 latency** | 120ms |
-| **P99 latency** | 368ms |
-| **Fastest** | 21ms |
-| **Slowest** | 1.99s |
+| **Requests/sec** | **4,418** |
+| **Total time** | 2.26s |
+| **Avg latency** | 95ms |
+| **P50 latency** | 81ms |
+| **P90 latency** | 127ms |
+| **P99 latency** | 421ms |
+| **Fastest** | 23ms |
+| **Slowest** | 747ms |
 | **Success rate** | 100% (10,000 × 200) |
 
 <details>
@@ -177,33 +177,33 @@ Details (average, fastest, slowest):
 
 ```
 Response time histogram:
-  0.021 [1]     |
-  0.218 [9366]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
-  0.415 [583]   |■■
-  0.612 [30]    |
-  0.809 [12]    |
-  1.006 [4]     |
-  1.203 [0]     |
-  1.400 [1]     |
-  1.598 [2]     |
-  1.795 [0]     |
-  1.992 [1]     |
+  0.023 [1]     |
+  0.096 [6902]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.168 [2527]  |■■■■■■■■■■■■■■■
+  0.240 [66]    |
+  0.312 [107]   |■
+  0.385 [158]   |■
+  0.457 [214]   |■
+  0.529 [21]    |
+  0.602 [0]     |
+  0.674 [0]     |
+  0.746 [4]     |
 
 Latency distribution:
-  10% in 0.0418s
-  25% in 0.0500s
-  50% in 0.0636s
-  75% in 0.0863s
-  90% in 0.1198s
-  95% in 0.2582s
-  99% in 0.3683s
+  10% in 0.0476s
+  25% in 0.0598s
+  50% in 0.0814s
+  75% in 0.1004s
+  90% in 0.1265s
+  95% in 0.2442s
+  99% in 0.4206s
 
 Details (average, fastest, slowest):
-  DNS+dialup:   0.0034s, 0.0000s, 0.2546s
-  DNS-lookup:   0.0017s, 0.0000s, 0.0409s
-  req write:    0.0000s, 0.0000s, 0.0178s
-  resp wait:    0.0616s, 0.0208s, 1.9915s
-  resp read:    0.0030s, 0.0000s, 0.8122s
+  DNS+dialup:   0.0038s, 0.0000s, 0.2980s
+  DNS-lookup:   0.0021s, 0.0000s, 0.0422s
+  req write:    0.0001s, 0.0000s, 0.0259s
+  resp wait:    0.0736s, 0.0231s, 0.4950s
+  resp read:    0.0009s, 0.0000s, 0.3689s
 ```
 
 </details>
