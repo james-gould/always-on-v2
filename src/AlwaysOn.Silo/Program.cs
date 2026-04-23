@@ -31,10 +31,6 @@ else
             $"Missing ConnectionStrings:{AspireConstants.CosmosDatabase} or Orleans:Cosmos:AccountEndpoint configuration.");
     }
 
-    // Use AAD auth when AccountEndpoint is provided, otherwise fall back to connection string.
-    // WorkloadIdentityCredential skips the DefaultAzureCredential probe chain
-    // and goes straight to the federated OIDC token exchange using env vars
-    // injected by the AKS workload-identity webhook.
     var useAadAuth = !string.IsNullOrWhiteSpace(cosmosAccountEndpoint);
     var credential = useAadAuth ? new WorkloadIdentityCredential() : null;
 
@@ -81,17 +77,8 @@ else
     });
 }
 
-// Redis-backed read cache for GET /events/{id}. If no Redis connection string
-// is configured (e.g. integration-test mode) this falls back to an in-process
-// cache so the endpoint contract is unchanged.
 builder.AddEventReadCache();
-
-// Event Grid reservation notifier + SignalR-fanout consumer. Falls back to an
-// in-memory no-op notifier when not configured so integration tests run
-// without a broker.
 builder.AddReservationMessaging();
-
-// Queue grain options, shared TimeProvider, and the self-hosted SignalR hub.
 builder.AddReservationQueueCore();
 
 var app = builder.Build();

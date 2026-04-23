@@ -30,24 +30,9 @@ internal static class QueueServiceCollectionExtensions
                 var configOptions = ConfigurationOptions.Parse(redisConnectionString!);
                 configOptions.Ssl = true;
                 configOptions.AbortOnConnectFail = false;
-                // Stay on RESP2. Azure Cache for Redis Basic/Standard runs
-                // Redis 6.x, which does not fully support RESP3 — negotiating
-                // HELLO 3 introduces failed handshakes and extra round-trips
-                // per command. RESP3 would only help on the Enterprise tier.
-                // Fail fast if Redis is unreachable rather than letting the
-                // default 5s syncTimeout stack up on every cache read+write.
                 configOptions.ConnectTimeout = 2000;
                 configOptions.SyncTimeout = 2000;
 
-                // AKS Workload Identity uses federated OIDC token exchange,
-                // NOT the IMDS endpoint. ConfigureForAzureWithUserAssignedManagedIdentityAsync
-                // uses ManagedIdentityCredential (IMDS) and fails with
-                // "Identity not found" on workload-identity pods.
-                //
-                // WorkloadIdentityCredential reads AZURE_CLIENT_ID / TENANT_ID /
-                // FEDERATED_TOKEN_FILE / AUTHORITY_HOST injected by the
-                // workload-identity webhook and performs the federated
-                // exchange directly — no IMDS involved.
                 var credential = new WorkloadIdentityCredential();
                 var uamiClientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
                 logger.LogInformation("Configuring Redis AAD auth with workload identity (client ID: {ClientId}).",
@@ -58,10 +43,6 @@ internal static class QueueServiceCollectionExtensions
 
                 var multiplexer = ConnectionMultiplexer.Connect(configOptions);
 
-                // Surface connection-level errors instead of letting them rot
-                // in the multiplexer's internal log. Without this, an auth
-                // failure or DNS miss just manifests as 5-second command
-                // timeouts with no explanation.
                 multiplexer.ConnectionFailed += (_, e) =>
                     logger.LogError(e.Exception, "Redis connection failed. Type={FailureType} Endpoint={Endpoint}", e.FailureType, e.EndPoint);
                 multiplexer.ConnectionRestored += (_, e) =>
@@ -93,11 +74,6 @@ internal static class QueueServiceCollectionExtensions
         if (!string.IsNullOrWhiteSpace(eventGridEndpoint))
         {
             var endpoint = new Uri(eventGridEndpoint);
-            // WorkloadIdentityCredential goes straight to the federated OIDC
-            // exchange using the env vars injected by the AKS workload-identity
-            // webhook. DefaultAzureCredential would also work (it has
-            // WorkloadIdentityCredential in its chain) but probes other sources
-            // first, adding startup latency and noisier error logs.
             var credential = new WorkloadIdentityCredential();
 
             builder.Services.AddSingleton(
