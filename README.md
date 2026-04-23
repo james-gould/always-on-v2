@@ -158,3 +158,53 @@ Details (average, fastest, slowest):
 
 </details>
 
+#### After Redis AAD Fix + Private Endpoint
+
+| Metric | Value |
+|---|---|
+| **Requests/sec** | **2,813** |
+| **Total time** | 3.56s |
+| **Avg latency** | 84ms |
+| **P50 latency** | 64ms |
+| **P90 latency** | 120ms |
+| **P99 latency** | 368ms |
+| **Fastest** | 21ms |
+| **Slowest** | 1.99s |
+| **Success rate** | 100% (10,000 × 200) |
+
+<details>
+<summary>Full output</summary>
+
+```
+Response time histogram:
+  0.021 [1]     |
+  0.218 [9366]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.415 [583]   |■■
+  0.612 [30]    |
+  0.809 [12]    |
+  1.006 [4]     |
+  1.203 [0]     |
+  1.400 [1]     |
+  1.598 [2]     |
+  1.795 [0]     |
+  1.992 [1]     |
+
+Latency distribution:
+  10% in 0.0418s
+  25% in 0.0500s
+  50% in 0.0636s
+  75% in 0.0863s
+  90% in 0.1198s
+  95% in 0.2582s
+  99% in 0.3683s
+
+Details (average, fastest, slowest):
+  DNS+dialup:   0.0034s, 0.0000s, 0.2546s
+  DNS-lookup:   0.0017s, 0.0000s, 0.0409s
+  req write:    0.0000s, 0.0000s, 0.0178s
+  resp wait:    0.0616s, 0.0208s, 1.9915s
+  resp read:    0.0030s, 0.0000s, 0.8122s
+```
+
+</details>
+
