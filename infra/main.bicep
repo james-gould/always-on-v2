@@ -91,6 +91,15 @@ module eventGrid 'modules/eventgrid.bicep' = {
   }
 }
 
+module observability 'modules/observability.bicep' = {
+  name: 'observability'
+  params: {
+    location: location
+    resourcePrefix: resourcePrefix
+    tags: tags
+  }
+}
+
 module aks 'modules/aks.bicep' = {
   name: 'aks'
   params: {
@@ -102,7 +111,27 @@ module aks 'modules/aks.bicep' = {
     vmSize: aksVmSize
     minNodeCount: aksMinNodeCount
     maxNodeCount: aksMaxNodeCount
+    logAnalyticsWorkspaceId: observability.outputs.logAnalyticsWorkspaceId
   }
+}
+
+// Attach the Prometheus Data Collection Rule to the AKS cluster. The managed
+// Prometheus addon (enabled above) uses this association to route scraped
+// metrics into the Azure Monitor workspace.
+resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' existing = {
+  name: '${resourcePrefix}-aks'
+}
+
+resource prometheusDcra 'Microsoft.Insights/dataCollectionRuleAssociations@2023-03-11' = {
+  name: '${resourcePrefix}-prom-dcra'
+  scope: aksCluster
+  properties: {
+    dataCollectionRuleId: observability.outputs.prometheusDcrId
+    description: 'Prometheus metrics scrape from AKS to Azure Monitor workspace.'
+  }
+  dependsOn: [
+    aks
+  ]
 }
 
 module acr 'modules/acr.bicep' = {
@@ -159,3 +188,5 @@ output eventGridEndpoint string = eventGrid.outputs.endpoint
 output ingressPipName string = ingressPip.outputs.pipName
 output ingressPipAddress string = ingressPip.outputs.pipAddress
 output ingressPipResourceGroup string = ingressPip.outputs.pipResourceGroup
+output logAnalyticsWorkspaceName string = observability.outputs.logAnalyticsWorkspaceName
+output azureMonitorWorkspaceName string = observability.outputs.azureMonitorWorkspaceName

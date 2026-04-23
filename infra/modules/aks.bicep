@@ -24,6 +24,9 @@ param minNodeCount int = 2
 @minValue(1)
 param maxNodeCount int = 5
 
+@description('Resource ID of the Log Analytics workspace for Container Insights.')
+param logAnalyticsWorkspaceId string
+
 var clusterName = '${resourcePrefix}-aks'
 
 resource aks 'Microsoft.ContainerService/managedClusters@2025-05-01' = {
@@ -81,10 +84,32 @@ resource aks 'Microsoft.ContainerService/managedClusters@2025-05-01' = {
     nodeProvisioningProfile: {
       mode: 'Manual'
     }
+    // Container Insights — ships stdout/stderr + kube events to Log Analytics.
+    addonProfiles: {
+      omsagent: {
+        enabled: true
+        config: {
+          logAnalyticsWorkspaceResourceID: logAnalyticsWorkspaceId
+          useAADAuth: 'true'
+        }
+      }
+    }
+    // Azure Managed Prometheus — node/pod/kube-state metrics to Azure Monitor workspace.
+    // The DCR association (created in main.bicep) tells the cluster where to send them.
+    azureMonitorProfile: {
+      metrics: {
+        enabled: true
+        kubeStateMetrics: {
+          metricLabelsAllowlist: ''
+          metricAnnotationsAllowList: ''
+        }
+      }
+    }
   }
 }
 
 output clusterName string = aks.name
+output clusterId string = aks.id
 output clusterIdentityPrincipalId string = aks.identity.principalId
 output kubeletIdentityObjectId string = aks.properties.identityProfile.kubeletidentity.objectId
 output oidcIssuerUrl string = aks.properties.oidcIssuerProfile.issuerURL
