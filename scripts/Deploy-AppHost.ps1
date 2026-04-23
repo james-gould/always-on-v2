@@ -248,17 +248,6 @@ foreach ($doc in $documents) {
     if (-not $trimmed) { continue }
     $docIndex++
 
-    # Patch silo-secrets: override Aspire-generated connection strings with Azure service endpoints.
-    # Secrets load after the ConfigMap via envFrom, so they win — we must patch them too.
-    if ($trimmed -match 'kind:\s*"Secret"' -and $trimmed -match 'name:\s*"silo-secrets"') {
-        $redisConnB64 = [System.Convert]::ToBase64String(
-            [System.Text.Encoding]::UTF8.GetBytes("$($redisHostName):6380,ssl=True,abortConnect=False"))
-        $eventGridB64 = [System.Convert]::ToBase64String(
-            [System.Text.Encoding]::UTF8.GetBytes($eventGridEndpoint))
-        $trimmed = $trimmed -replace '(?m)^\s*ConnectionStrings__cache:.*$', "  ConnectionStrings__cache: `"$redisConnB64`""
-        $trimmed = $trimmed -replace '(?m)^\s*ConnectionStrings__eventgrid:.*$', "  ConnectionStrings__eventgrid: `"$eventGridB64`""
-    }
-
     # Patch silo-config: add Cosmos endpoint, Redis, Event Grid, and remove stale connection strings
     if ($trimmed -match 'kind:\s*"ConfigMap"' -and $trimmed -match 'name:\s*"silo-config"') {
         # Remove the placeholder connection string and URI
@@ -309,6 +298,14 @@ Write-Host "  Rendered $docIndex manifest(s)"
 # Apply all rendered manifests idempotently
 kubectl apply -f $outputDir --recursive
 if ($LASTEXITCODE -ne 0) { Write-Error 'kubectl apply failed.' }
+
+# Patch silo-secrets with correct Azure service endpoints.
+# The Aspire-generated secret uses in-cluster service names; we override with Azure endpoints.
+# Using stringData so K8s handles base64 encoding automatically.
+$redisConn = "$($redisHostName):6380,ssl=True,abortConnect=False"
+$patchJson = @{ stringData = @{ ConnectionStrings__cache = $redisConn; ConnectionStrings__eventgrid = $eventGridEndpoint } } | ConvertTo-Json -Compress
+kubectl patch secret silo-secrets --type=merge -p $patchJson
+if ($LASTEXITCODE -ne 0) { Write-Error 'Failed to patch silo-secrets.' }
 
 # Wait for the LoadBalancer external IP to be assigned
 Write-Host "`nWaiting for silo-service external IP..." -ForegroundColor Cyan
