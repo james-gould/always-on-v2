@@ -23,34 +23,36 @@ internal static class QueueServiceCollectionExtensions
 
         if (hasRedis)
         {
-            builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+            builder.Services.AddSingleton(sp =>
             {
                 var logger = sp.GetRequiredService<ILogger<RedisEventReadCache>>();
 
-                var configOptions = ConfigurationOptions.Parse(redisConnectionString!);
-                configOptions.Ssl = true;
-                configOptions.AbortOnConnectFail = false;
-                configOptions.ConnectTimeout = 2000;
-                configOptions.SyncTimeout = 2000;
+                return new Lazy<Task<IConnectionMultiplexer>>(async () =>
+                {
+                    var configOptions = ConfigurationOptions.Parse(redisConnectionString!);
+                    configOptions.Ssl = true;
+                    configOptions.AbortOnConnectFail = false;
+                    configOptions.ConnectTimeout = 5000;
+                    configOptions.SyncTimeout = 2000;
 
-                var credential = new WorkloadIdentityCredential();
-                var uamiClientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
-                logger.LogInformation("Configuring Redis AAD auth with workload identity (client ID: {ClientId}).",
-                    uamiClientId ?? "<unset>");
+                    var credential = new WorkloadIdentityCredential();
+                    var uamiClientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
+                    logger.LogInformation("Configuring Redis AAD auth with workload identity (client ID: {ClientId}).",
+                        uamiClientId ?? "<unset>");
 
-                configOptions.ConfigureForAzureWithTokenCredentialAsync(credential)
-                    .GetAwaiter().GetResult();
+                    await configOptions.ConfigureForAzureWithTokenCredentialAsync(credential);
 
-                var multiplexer = ConnectionMultiplexer.Connect(configOptions);
+                    var multiplexer = await ConnectionMultiplexer.ConnectAsync(configOptions);
 
-                multiplexer.ConnectionFailed += (_, e) =>
-                    logger.LogError(e.Exception, "Redis connection failed. Type={FailureType} Endpoint={Endpoint}", e.FailureType, e.EndPoint);
-                multiplexer.ConnectionRestored += (_, e) =>
-                    logger.LogInformation("Redis connection restored. Endpoint={Endpoint}", e.EndPoint);
-                multiplexer.InternalError += (_, e) =>
-                    logger.LogError(e.Exception, "Redis internal error. Origin={Origin}", e.Origin);
+                    multiplexer.ConnectionFailed += (_, e) =>
+                        logger.LogError(e.Exception, "Redis connection failed. Type={FailureType} Endpoint={Endpoint}", e.FailureType, e.EndPoint);
+                    multiplexer.ConnectionRestored += (_, e) =>
+                        logger.LogInformation("Redis connection restored. Endpoint={Endpoint}", e.EndPoint);
+                    multiplexer.InternalError += (_, e) =>
+                        logger.LogError(e.Exception, "Redis internal error. Origin={Origin}", e.Origin);
 
-                return multiplexer;
+                    return (IConnectionMultiplexer)multiplexer;
+                });
             });
 
             builder.Services.AddOptions<EventReadCacheOptions>()

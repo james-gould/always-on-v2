@@ -5,7 +5,7 @@ using StackExchange.Redis;
 
 namespace AlwaysOn.Silo.Queueing;
 
-internal sealed class RedisQueueIndex(IConnectionMultiplexer redis, ILogger<RedisQueueIndex> logger) : IQueueIndex
+internal sealed class RedisQueueIndex(Lazy<Task<IConnectionMultiplexer>> redisFactory, ILogger<RedisQueueIndex> logger) : IQueueIndex
 {
     private const string _keyPrefix = "queue:";
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
@@ -19,6 +19,7 @@ internal sealed class RedisQueueIndex(IConnectionMultiplexer redis, ILogger<Redi
 
         try
         {
+            var redis = await redisFactory.Value;
             await redis.GetDatabase().StringSetAsync(key, payload, ttl).WaitAsync(cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -34,6 +35,7 @@ internal sealed class RedisQueueIndex(IConnectionMultiplexer redis, ILogger<Redi
         var key = _keyPrefix + queueId;
         try
         {
+            var redis = await redisFactory.Value;
             var value = await redis.GetDatabase().StringGetAsync(key).WaitAsync(cancellationToken);
             if (value.IsNullOrEmpty)
             {
@@ -56,6 +58,7 @@ internal sealed class RedisQueueIndex(IConnectionMultiplexer redis, ILogger<Redi
 
         try
         {
+            var redis = await redisFactory.Value;
             await redis.GetDatabase().KeyDeleteAsync(_keyPrefix + queueId).WaitAsync(cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

@@ -21,7 +21,7 @@ public sealed class EventReadCacheOptions
 /// repopulates from the grain.
 /// </summary>
 internal sealed class RedisEventReadCache(
-    IConnectionMultiplexer redis,
+    Lazy<Task<IConnectionMultiplexer>> redisFactory,
     IOptions<EventReadCacheOptions> options,
     ILogger<RedisEventReadCache> logger) : IEventReadCache
 {
@@ -35,6 +35,7 @@ internal sealed class RedisEventReadCache(
         ArgumentNullException.ThrowIfNull(loader);
 
         var key = BuildKey(eventId);
+        var redis = await redisFactory.Value;
         var db = redis.GetDatabase();
 
         try
@@ -71,6 +72,7 @@ internal sealed class RedisEventReadCache(
 
         try
         {
+            var redis = await redisFactory.Value;
             await redis.GetDatabase().KeyDeleteAsync(BuildKey(eventId)).WaitAsync(cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
