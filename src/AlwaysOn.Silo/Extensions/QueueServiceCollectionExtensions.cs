@@ -35,11 +35,13 @@ internal static class QueueServiceCollectionExtensions
             // every endpoint. Failing fast here surfaces misconfiguration to
             // the platform (pod restart) and keeps the request path
             // exception-free on Redis setup.
-            configOptions.ConfigureForAzureWithTokenCredentialAsync(new DefaultAzureCredential())
-                .ConfigureAwait(false).GetAwaiter().GetResult();
-            var multiplexer = ConnectionMultiplexer.Connect(configOptions);
+            builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+            {
+                configOptions.ConfigureForAzureWithTokenCredentialAsync(new DefaultAzureCredential())
+                    .GetAwaiter().GetResult();
 
-            builder.Services.AddSingleton<IConnectionMultiplexer>(multiplexer);
+                return ConnectionMultiplexer.Connect(configOptions);
+            });
 
             builder.Services.AddOptions<EventReadCacheOptions>()
                 .Bind(builder.Configuration.GetSection("EventReadCache"));
