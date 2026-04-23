@@ -40,25 +40,22 @@ internal static class QueueServiceCollectionExtensions
                 configOptions.ConnectTimeout = 2000;
                 configOptions.SyncTimeout = 2000;
 
-                // Use the UAMI explicitly. The AKS workload-identity webhook
-                // sets AZURE_CLIENT_ID on the pod, so DefaultAzureCredential
-                // works — but going through its probe chain (Environment,
-                // WorkloadIdentity, ManagedIdentity) adds several seconds of
-                // latency to the first token fetch. Going straight to the UAMI
-                // by client ID is deterministic and fast.
+                // AKS Workload Identity uses federated OIDC token exchange,
+                // NOT the IMDS endpoint. ConfigureForAzureWithUserAssignedManagedIdentityAsync
+                // uses ManagedIdentityCredential (IMDS) and fails with
+                // "Identity not found" on workload-identity pods.
+                //
+                // WorkloadIdentityCredential reads AZURE_CLIENT_ID / TENANT_ID /
+                // FEDERATED_TOKEN_FILE / AUTHORITY_HOST injected by the
+                // workload-identity webhook and performs the federated
+                // exchange directly — no IMDS involved.
+                var credential = new WorkloadIdentityCredential();
                 var uamiClientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
-                if (!string.IsNullOrWhiteSpace(uamiClientId))
-                {
-                    logger.LogInformation("Configuring Redis AAD auth with user-assigned managed identity {ClientId}.", uamiClientId);
-                    configOptions.ConfigureForAzureWithUserAssignedManagedIdentityAsync(uamiClientId)
-                        .GetAwaiter().GetResult();
-                }
-                else
-                {
-                    logger.LogInformation("AZURE_CLIENT_ID not set; falling back to DefaultAzureCredential for Redis AAD auth.");
-                    configOptions.ConfigureForAzureWithTokenCredentialAsync(new DefaultAzureCredential())
-                        .GetAwaiter().GetResult();
-                }
+                logger.LogInformation("Configuring Redis AAD auth with workload identity (client ID: {ClientId}).",
+                    uamiClientId ?? "<unset>");
+
+                configOptions.ConfigureForAzureWithTokenCredentialAsync(credential)
+                    .GetAwaiter().GetResult();
 
                 var multiplexer = ConnectionMultiplexer.Connect(configOptions);
 
@@ -97,7 +94,12 @@ internal static class QueueServiceCollectionExtensions
         if (!string.IsNullOrWhiteSpace(eventGridEndpoint))
         {
             var endpoint = new Uri(eventGridEndpoint);
-            var credential = new DefaultAzureCredential();
+            // WorkloadIdentityCredential goes straight to the federated OIDC
+            // exchange using the env vars injected by the AKS workload-identity
+            // webhook. DefaultAzureCredential would also work (it has
+            // WorkloadIdentityCredential in its chain) but probes other sources
+            // first, adding startup latency and noisier error logs.
+            var credential = new WorkloadIdentityCredential();
 
             builder.Services.AddSingleton(
                 new EventGridSenderClient(endpoint, AspireConstants.EventGridTopic, credential));

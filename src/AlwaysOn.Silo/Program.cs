@@ -31,9 +31,12 @@ else
             $"Missing ConnectionStrings:{AspireConstants.CosmosDatabase} or Orleans:Cosmos:AccountEndpoint configuration.");
     }
 
-    // Use AAD auth when AccountEndpoint is provided, otherwise fall back to connection string
+    // Use AAD auth when AccountEndpoint is provided, otherwise fall back to connection string.
+    // WorkloadIdentityCredential skips the DefaultAzureCredential probe chain
+    // and goes straight to the federated OIDC token exchange using env vars
+    // injected by the AKS workload-identity webhook.
     var useAadAuth = !string.IsNullOrWhiteSpace(cosmosAccountEndpoint);
-    var credential = useAadAuth ? new DefaultAzureCredential() : null;
+    var credential = useAadAuth ? new WorkloadIdentityCredential() : null;
 
     var cosmosDatabaseName = builder.Configuration["Orleans:Cosmos:DatabaseName"] ?? AspireConstants.CosmosDatabase;
     var clusteringContainerName = builder.Configuration["Orleans:Cosmos:ClusteringContainerName"] ?? AspireConstants.OrleansClusteringContainer;
