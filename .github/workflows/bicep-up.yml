@@ -103,6 +103,22 @@ jobs:
           [ "$(az group exists --name "$RG")" = "true" ] || \
             az group create --name "$RG" --location "$LOCATION" -o none
 
+      - name: Ensure AKS is running
+        run: |
+          RG="rg-alwayson-${TARGET_ENVIRONMENT}"
+          CLUSTER="alwayson-${TARGET_ENVIRONMENT}-aks"
+          # Skip silently if the cluster doesn't exist yet (first deploy).
+          if ! az aks show -g "$RG" -n "$CLUSTER" -o none 2>/dev/null; then
+            echo "Cluster $CLUSTER does not exist yet — skipping start."
+            exit 0
+          fi
+          STATE=$(az aks show -g "$RG" -n "$CLUSTER" --query "powerState.code" -o tsv)
+          echo "AKS power state: $STATE"
+          if [ "$STATE" != "Running" ]; then
+            echo "Starting cluster $CLUSTER (Bicep PATCH fails unless the cluster is Running)..."
+            az aks start -g "$RG" -n "$CLUSTER"
+          fi
+
       - name: Deploy Bicep
         id: bicep
         run: |

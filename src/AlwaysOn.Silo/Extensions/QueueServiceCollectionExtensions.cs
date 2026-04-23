@@ -23,24 +23,57 @@ internal static class QueueServiceCollectionExtensions
 
         if (hasRedis)
         {
-            var configOptions = ConfigurationOptions.Parse(redisConnectionString!);
-            configOptions.AbortOnConnectFail = false;
-            configOptions.Ssl = true;
-
-            // Acquire the AAD token and connect eagerly at startup rather than
-            // inside a lazy DI factory. Doing this inside the factory meant any
-            // token-acquisition failure (or transient credential hiccup)
-            // re-threw during singleton resolution of IEventReadCache and
-            // IQueueIndex on the first request, surfacing as an HTTP 500 on
-            // every endpoint. Failing fast here surfaces misconfiguration to
-            // the platform (pod restart) and keeps the request path
-            // exception-free on Redis setup.
-            builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+            builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
             {
-                configOptions.ConfigureForAzureWithTokenCredentialAsync(new DefaultAzureCredential())
-                    .GetAwaiter().GetResult();
+                var logger = sp.GetRequiredService<ILogger<RedisEventReadCache>>();
 
-                return ConnectionMultiplexer.Connect(configOptions);
+                var configOptions = ConfigurationOptions.Parse(redisConnectionString!);
+                configOptions.Ssl = true;
+                configOptions.AbortOnConnectFail = false;
+                // RESP3 keeps the interactive + subscription traffic on one
+                // connection that gets proactively re-authenticated with fresh
+                // AAD tokens (RESP2 drops the subscription connection every
+                // hour, which surfaces as "MicrosoftEntraTokenExpired" errors).
+                configOptions.Protocol = RedisProtocol.Resp3;
+                // Fail fast if Redis is unreachable rather than letting the
+                // default 5s syncTimeout stack up on every cache read+write.
+                configOptions.ConnectTimeout = 2000;
+                configOptions.SyncTimeout = 2000;
+
+                // Use the UAMI explicitly. The AKS workload-identity webhook
+                // sets AZURE_CLIENT_ID on the pod, so DefaultAzureCredential
+                // works — but going through its probe chain (Environment,
+                // WorkloadIdentity, ManagedIdentity) adds several seconds of
+                // latency to the first token fetch. Going straight to the UAMI
+                // by client ID is deterministic and fast.
+                var uamiClientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
+                if (!string.IsNullOrWhiteSpace(uamiClientId))
+                {
+                    logger.LogInformation("Configuring Redis AAD auth with user-assigned managed identity {ClientId}.", uamiClientId);
+                    configOptions.ConfigureForAzureWithUserAssignedManagedIdentityAsync(uamiClientId)
+                        .GetAwaiter().GetResult();
+                }
+                else
+                {
+                    logger.LogInformation("AZURE_CLIENT_ID not set; falling back to DefaultAzureCredential for Redis AAD auth.");
+                    configOptions.ConfigureForAzureWithTokenCredentialAsync(new DefaultAzureCredential())
+                        .GetAwaiter().GetResult();
+                }
+
+                var multiplexer = ConnectionMultiplexer.Connect(configOptions);
+
+                // Surface connection-level errors instead of letting them rot
+                // in the multiplexer's internal log. Without this, an auth
+                // failure or DNS miss just manifests as 5-second command
+                // timeouts with no explanation.
+                multiplexer.ConnectionFailed += (_, e) =>
+                    logger.LogError(e.Exception, "Redis connection failed. Type={FailureType} Endpoint={Endpoint}", e.FailureType, e.EndPoint);
+                multiplexer.ConnectionRestored += (_, e) =>
+                    logger.LogInformation("Redis connection restored. Endpoint={Endpoint}", e.EndPoint);
+                multiplexer.InternalError += (_, e) =>
+                    logger.LogError(e.Exception, "Redis internal error. Origin={Origin}", e.Origin);
+
+                return multiplexer;
             });
 
             builder.Services.AddOptions<EventReadCacheOptions>()
