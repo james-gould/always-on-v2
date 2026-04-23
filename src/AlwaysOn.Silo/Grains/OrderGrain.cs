@@ -3,16 +3,11 @@ using AlwaysOn.Shared.Models;
 
 namespace AlwaysOn.Silo.Grains;
 
-public class OrderGrain : Grain, IOrderGrain
+public class OrderGrain([PersistentState("order", "Default")] IPersistentState<OrderDetails> orderState) : Grain, IOrderGrain
 {
-	private readonly IPersistentState<OrderDetails> _orderState;
+	private readonly IPersistentState<OrderDetails> _orderState = orderState;
 
-	public OrderGrain([PersistentState("order", "Default")] IPersistentState<OrderDetails> orderState)
-	{
-		_orderState = orderState;
-	}
-
-	public Task<OrderDetails> GetAsync()
+    public Task<OrderDetails> GetAsync()
 	{
 		if (_orderState.RecordExists)
 		{

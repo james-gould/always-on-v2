@@ -8,20 +8,15 @@ namespace AlwaysOn.Silo.Caching;
 /// in-memory integration-test mode). Behaviour mirrors the Redis implementation
 /// well enough that endpoints don't need to branch.
 /// </summary>
-internal sealed class InMemoryEventReadCache : IEventReadCache
+internal sealed class InMemoryEventReadCache(TimeSpan ttl) : IEventReadCache
 {
     private sealed record Entry(EventDetails Value, DateTimeOffset ExpiresAtUtc);
 
     private readonly ConcurrentDictionary<string, Entry> _entries = new();
-    private readonly TimeSpan _ttl;
+    private readonly TimeSpan _ttl = ttl;
 
     public InMemoryEventReadCache() : this(TimeSpan.FromSeconds(60))
     {
-    }
-
-    public InMemoryEventReadCache(TimeSpan ttl)
-    {
-        _ttl = ttl;
     }
 
     public async Task<EventDetails> GetOrLoadAsync(string eventId, Func<Task<EventDetails>> loader, CancellationToken cancellationToken = default)

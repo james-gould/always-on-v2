@@ -3,14 +3,9 @@ using AlwaysOn.Shared.Models;
 
 namespace AlwaysOn.Silo.Grains;
 
-public class TicketGrain : Grain, ITicketGrain
+public class TicketGrain([PersistentState("ticket", "Default")] IPersistentState<TicketDetails> ticketState) : Grain, ITicketGrain
 {
-    private readonly IPersistentState<TicketDetails> _ticketState;
-
-    public TicketGrain([PersistentState("ticket", "Default")] IPersistentState<TicketDetails> ticketState)
-    {
-        _ticketState = ticketState;
-    }
+    private readonly IPersistentState<TicketDetails> _ticketState = ticketState;
 
     public Task<TicketDetails> GetAsync()
     {

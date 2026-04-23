@@ -47,13 +47,17 @@ rectangle "Resource Group  //rg-alwayson-<env>//" as rg #e8e8e8 {
     }
   }
 
-  rectangle "Azure Cache for Redis\n//Basic · AAD-only//\n//TLS 1.2 · public: Disabled//" as redis #d83b01;text:white
+  rectangle "Azure Cache for Redis\n//Standard · AAD-only//\n//TLS 1.2 · public: Disabled//" as redis #d83b01;text:white
 
   rectangle "Event Grid Namespace\n//Standard · pull delivery//\n//topic: reservations//\n//sub: reservations-ready//" as eg #5c2d91;text:white
 
   rectangle "Key Vault\n//RBAC · Soft-delete 90d//\n//public: Disabled//" as kv #0078d4;text:white
 
   rectangle "Azure Container Registry\n//AKS kubelet AcrPull//" as acr #0078d4;text:white
+
+  ' ── Observability ────────────────────────────────────────────
+  rectangle "Log Analytics Workspace\n//30-day retention//" as law #0078d4;text:white
+  rectangle "Azure Monitor Workspace\n//Managed Prometheus//" as amw #0078d4;text:white
 
   rectangle "User-Assigned MI\n//silo-id//\n//federated → silo-sa//" as uami #7fba00;text:white
 
@@ -97,100 +101,13 @@ uami .right.> cosmos : Cosmos\nData Contributor
 uami .right.> redis : Redis\nData Contributor
 uami .right.> eg : EG Sender +\nReceiver
 
+' ── Observability ─────────────────────────────────────────────
+aks -right-> law : Container\nInsights (DCR)
+aks -right-> amw : Managed\nPrometheus (DCR)
+
 ' ── Layout hints ─────────────────────────────────────────────
 sn_sys -[hidden]right- sn_gw
 sn_gw -[hidden]right- sn_silo
 sn_silo -[hidden]right- sn_pe
-
-@enduml
-@startuml
-!theme plain
-skinparam linetype ortho
-skinparam nodesep 60
-skinparam ranksep 50
-skinparam rectangle {
-  roundCorner 10
-}
-
-' ── Internet ──────────────────────────────────────────────────
-cloud "Internet" as inet #f0f0f0
-
-' ── Azure Front Door (global, public-facing) ─────────────────
-rectangle "Azure Front Door Premium" as afd #0078d4;text:white {
-  rectangle "Endpoint\n//alwayson-endpoint//" as afd_ep
-  rectangle "WAF Policy\n//Prevention mode//" as waf
-  rectangle "Route\n/* → AKS origin" as afd_route
-}
-
-' ── Resource Group ────────────────────────────────────────────
-rectangle "Resource Group" as rg #e8e8e8 {
-
-  ' ── VNet ────────────────────────────────────────────────────
-  rectangle "VNet  10.0.0.0/14" as vnet #e6f2ff {
-
-    ' AKS subnets
-    rectangle "aks-system\n10.0.0.0/16" as sn_sys #fff3cd
-    rectangle "aks-gateway\n10.1.0.0/16" as sn_gw #fff3cd
-    rectangle "aks-silo\n10.2.0.0/16" as sn_silo #fff3cd
-
-    ' Shared PE subnet
-    rectangle "private-endpoints\n10.3.0.0/24" as sn_pe #d4edda
-
-    ' PLS subnet
-    rectangle "private-link-service\n10.3.1.0/24" as sn_pls #d4edda
-  }
-
-  ' ── AKS ─────────────────────────────────────────────────────
-  rectangle "AKS Cluster" as aks #326ce5;text:white {
-    rectangle "System Pool\nD2s v5 × 2–4" as pool_sys
-    rectangle "Gateway Pool\nD4s v5 × 2–20" as pool_gw
-    rectangle "Silo Pool\nE4s v5 × 3–15" as pool_silo
-  }
-
-  ' ── PaaS ────────────────────────────────────────────────────
-  database "Cosmos DB\n//Serverless · Session//" as cosmos #0078d4;text:white {
-    storage "alwayson" as cosmos_db {
-      collections "orleans-clustering" as c_cl
-      collections "orleans-grain-state" as c_gs
-      collections "orleans-reminders" as c_rm
-    }
-  }
-
-  rectangle "Key Vault\n//RBAC · Soft Delete//" as kv #0078d4;text:white
-
-  rectangle "Log Analytics\n//30-day retention//" as logs #0078d4;text:white
-
-  ' ── Private DNS ─────────────────────────────────────────────
-  rectangle "Private DNS" as dns #f5f5f5 {
-    rectangle "privatelink.\ndocuments.azure.com" as dns_cosmos
-    rectangle "privatelink.\nvaultcore.azure.net" as dns_kv
-  }
-}
-
-' ── Connections ───────────────────────────────────────────────
-inet -down-> afd_ep : HTTPS
-afd_ep -down-> waf
-waf .right.> afd_route
-afd_route -down-> sn_pls : Private Link\nService
-
-sn_pls -down-> pool_gw : Internal LB
-
-pool_sys -[hidden]right- pool_gw
-pool_gw -[hidden]right- pool_silo
-
-pool_sys -up-> sn_sys
-pool_gw -up-> sn_gw
-pool_silo -up-> sn_silo
-
-pool_silo -down-> sn_pe : Private\nEndpoint
-pool_gw -down-> sn_pe : Private\nEndpoint
-
-sn_pe -down-> cosmos : PE
-sn_pe -down-> kv : PE
-
-dns_cosmos .left.> cosmos : resolves
-dns_kv .left.> kv : resolves
-
-aks -right-> logs : Container\nInsights
 
 @enduml

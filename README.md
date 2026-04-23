@@ -4,8 +4,11 @@ A ramp-up project for Senior Software Engineers at Microsoft, architecturing a g
 - AKS (Kubernetes 1.33)
 - CosmosDB (AAD auth via workload identity)
 - Azure Container Registry
+- Azure Cache for Redis (AAD auth via workload identity)
+- Azure Event Grid (pull delivery)
 - Azure Key Vault
 - Azure Front Door Premium
+- Azure Monitor (Container Insights + Managed Prometheus)
 - ASP.NET Core 10 / .NET Aspire
 - Bicep for IaC
 - GitHub Actions CI/CD
@@ -18,11 +21,11 @@ The scenario being scaled is a replica of Ticketmaster, the distribution of even
 
 The architecture leans into Orleans' strengths rather than fighting them with HTTP boundaries between services. Grain-to-grain communication within a single cluster is sub-millisecond and avoids the serialisation overhead of cross-service HTTP calls, making it the natural fit for the tightly coupled flows of seat reservation, order creation and payment confirmation.
 
-There are two discrete runtime components and a shared library:
+There are two discrete build artefacts and a shared library:
 
-- **Gateway** — A thin, stateless ASP.NET Core API sitting behind Azure Front Door. Handles request validation before forwarding calls into the Orleans cluster as a client. Scales horizontally with no state.
-- **Silo** — The Orleans silo hosting all grain implementations. Co-hosts ASP.NET Core for health checks and diagnostics but does not serve public traffic. Scales based on grain count and CPU utilisation.
-- **Shared** — A class library containing grain interfaces, shared DTOs and constants, referenced by both the Gateway and Silo projects.
+- **Silo** — The Orleans silo hosting all grain implementations and the public-facing ASP.NET Core API (endpoints, SignalR hub). Sits behind Azure Front Door via a Kubernetes `LoadBalancer` service. Scales based on grain count and CPU utilisation.
+- **Shared** — A class library containing grain interfaces, shared DTOs and constants, referenced by the Silo and integration tests.
+- **ServiceDefaults** — Aspire service defaults (OpenTelemetry, health checks, resilience).
 
 #### Grain Design
 
@@ -35,9 +38,9 @@ Orleans guarantees single-threaded execution per grain, eliminating the need for
 
 #### Purchase Flow
 
-1. The user reserves a seat via the Gateway, which calls `SectionGrain.ReserveAsync`.
+1. The user reserves a seat via `POST /events/{id}/sections/{sectionId}/reserve`, which calls `SectionGrain.ReserveAsync`.
 2. The SectionGrain checks its bitmap, marks the seat as held and returns success or failure.
-3. The Gateway creates an `OrderGrain`, which transitions to `SeatsHeld` and registers an expiry reminder.
+3. The endpoint creates an `OrderGrain`, which transitions to `SeatsHeld` and registers an expiry reminder.
 4. On payment, the OrderGrain calls the payment provider, then makes grain-to-grain calls to `SectionGrain.ConfirmSeatAsync` and `UserGrain.AddOrderAsync` — no HTTP, no serialisation, just in-memory routing within the cluster.
 
 #### Reservation Queue
@@ -84,7 +87,7 @@ A provisioned-autoscale CosmosDB account (1,000 RU/s max, Session consistency) i
 - `orleans-grain-state` (partitioned on `/PartitionKey`) — Persistent grain state.
 - `orleans-reminders` (partitioned on `/PartitionKey`) — Reminder registrations.
 
-The account is accessible only via a private endpoint in the shared PE subnet; public network access is disabled entirely. Local (key-based) auth is disabled — the Silo authenticates using `DefaultAzureCredential` via a User-Assigned Managed Identity with the Cosmos DB Built-in Data Contributor role, federated to the `silo-sa` Kubernetes service account through AKS workload identity. Automatic failover is enabled.
+The account is accessible only via a private endpoint in the shared PE subnet; public network access is disabled entirely. Local (key-based) auth is disabled — the Silo authenticates using `WorkloadIdentityCredential` via a User-Assigned Managed Identity with the Cosmos DB Built-in Data Contributor role, federated to the `silo-sa` Kubernetes service account through AKS workload identity. Automatic failover is enabled.
 
 ##### Secrets — Key Vault
 
@@ -92,15 +95,25 @@ A Standard-tier Key Vault is deployed with RBAC authorisation, soft delete (90-d
 
 ##### Cache — Azure Cache for Redis
 
-A Standard-tier Redis instance with `disableAccessKeyAuthentication: true` (AAD-only), `publicNetworkAccess: Disabled` and TLS 1.2 minimum. The Silo's managed identity is granted the built-in `Data Contributor` access policy; traffic is routed via a private endpoint in the shared PE subnet with the `privatelink.redis.cache.windows.net` DNS zone linked to the VNet. Used for the `GET /events/{id}` read cache and the queue-position mirror.
+A Standard-tier Redis 6.x instance with `disableAccessKeyAuthentication: true` (AAD-only), `publicNetworkAccess: Disabled` and TLS 1.2 minimum. The Silo's managed identity is granted the built-in `Data Contributor` access policy; traffic is routed via a private endpoint in the shared PE subnet with the `privatelink.redis.cache.windows.net` DNS zone linked to the VNet. Used for the `GET /events/{id}` read cache and the queue-position mirror.
+
+The Redis connection is initialised asynchronously via a `Lazy<Task<IConnectionMultiplexer>>` singleton to avoid blocking the .NET thread pool during startup — a synchronous `GetAwaiter().GetResult()` call during DI resolution was found to cause 10+ second thread pool starvation, freezing Orleans membership timers. The `WorkloadIdentityCredential` token is acquired via `ConfigureForAzureWithTokenCredentialAsync` using the RESP2 protocol (required for Basic/Standard Redis 6.x).
 
 ##### Messaging — Azure Event Grid
 
 A Standard-tier Event Grid Namespace with public access disabled and TLS 1.2 minimum. A `reservations` namespace topic with a `reservations-ready` queue event subscription carries reservation-ready events produced by `ReservationQueueGrain` and consumed by the in-silo `ReservationReadyConsumer` via pull delivery, which fans them out over SignalR. The Silo identity is granted the `EventGrid Data Sender` and `EventGrid Data Receiver` roles at namespace scope; traffic flows via a private endpoint with `privatelink.eventgrid.azure.net`.
 
+##### Observability — Azure Monitor
+
+- **Log Analytics Workspace** — 30-day retention, ingests Container Insights logs from AKS via a dedicated Data Collection Rule (DCR) and DCR Association (DCRA).
+- **Azure Monitor Workspace** — Managed Prometheus metric store, fed by a Prometheus-forwarder DCR scraping the AKS metrics addon.
+- **Data Collection Endpoint** — Shared ingestion endpoint for both the Container Insights and Prometheus DCRs.
+
+The AKS addon uses `useAADAuth: true` for Container Insights, which requires both a CI DCR targeting the LAW and a DCRA scoped to the cluster — without these, the `ama-logs` agent fails onboarding silently.
+
 ##### Edge — Azure Front Door
 
-Azure Front Door Premium acts as the global entry point, terminating TLS and routing traffic to the AKS public load balancer. Direct-to-origin access is blocked at the NSG layer (see Networking above), so AFD is the only external path into the cluster. A WAF policy runs in Prevention mode with Microsoft Default Rule Set 2.1 and Bot Manager Rule Set 1.1. A custom rate-limit rule caps requests at 1,000 per minute per client IP.
+Azure Front Door Premium acts as the global entry point, terminating TLS and routing traffic to the AKS public load balancer via a pre-allocated static Standard Public IP. Direct-to-origin access is blocked at the NSG layer (see Networking above), so AFD is the only external path into the cluster. A WAF policy runs in Prevention mode with Microsoft Default Rule Set 2.1 and Bot Manager Rule Set 1.1. A custom rate-limit rule caps requests at 1,000 per minute per client IP.
 
 ---
 

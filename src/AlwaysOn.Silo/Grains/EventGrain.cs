@@ -3,16 +3,11 @@ using AlwaysOn.Shared.Models;
 
 namespace AlwaysOn.Silo.Grains;
 
-public class EventGrain : Grain, IEventGrain
+public class EventGrain([PersistentState("event", "Default")] IPersistentState<EventDetails> eventState) : Grain, IEventGrain
 {
-	private readonly IPersistentState<EventDetails> _eventState;
+	private readonly IPersistentState<EventDetails> _eventState = eventState;
 
-	public EventGrain([PersistentState("event", "Default")] IPersistentState<EventDetails> eventState)
-	{
-		_eventState = eventState;
-	}
-
-	public Task<EventDetails> GetAsync()
+    public Task<EventDetails> GetAsync()
 	{
 		if (_eventState.RecordExists)
 		{
