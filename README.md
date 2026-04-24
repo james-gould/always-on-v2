@@ -63,7 +63,13 @@ High-demand on-sales are absorbed by an Event Grid–driven reservation queue ra
 
 All infrastructure is defined in Bicep, modularised under `infra/` with a single `main.bicep` entry point composing discrete modules for networking, compute, data and edge.
 
+#### Version 1
+
 ![Infrastructure Topology](assets/topology.png)
+
+#### Version 2
+
+![Infra v2](assets/topology%20v2.png)
 
 ##### Networking
 

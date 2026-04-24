@@ -11,6 +11,7 @@ on:
         options:
           - dev
           - staging
+          - prod
   push:
     branches: [master]
     paths:
