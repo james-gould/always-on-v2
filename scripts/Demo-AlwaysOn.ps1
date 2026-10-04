@@ -25,7 +25,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$BaseUrl = "https://alwayson-dev-endpoint-h9ckhvhgfwgagtas.b01.azurefd.net",
+    [string]$BaseUrl = "https://alwayson-prod-endpoint-f5gzagcgfudjfzhm.b01.azurefd.net",
     [switch]$SkipLoadTest
 )
 
@@ -60,10 +60,15 @@ function Invoke-Api {
         $resp = Invoke-WebRequest @params -SkipHttpErrorCheck
     }
 
+    $body = $null
+    if ($resp.Content) {
+        try { $body = $resp.Content | ConvertFrom-Json } catch { $body = $resp.Content }
+    }
+
     $result = [PSCustomObject]@{
         Status   = $resp.StatusCode
         TimeMs   = [int]$time.TotalMilliseconds
-        Body     = if ($resp.Content) { $resp.Content | ConvertFrom-Json } else { $null }
+        Body     = $body
         RawBody  = $resp.Content
     }
 
@@ -202,7 +207,7 @@ for ($i = 1; $i -le 3; $i++) {
     }
     if ($enqueue.Body) {
         $queueIds += $enqueue.Body.queueId
-        Write-Host "    → User queue-user-$i: position=$($enqueue.Body.position), status=$($enqueue.Body.status)" -ForegroundColor DarkGray
+        Write-Host "    → User queue-user-${i}: position=$($enqueue.Body.position), status=$($enqueue.Body.status)" -ForegroundColor DarkGray
     }
 }
 
